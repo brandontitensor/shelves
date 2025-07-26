@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="false" userDefinedModelVersionIdentifier="">
-    <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
-        <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22758" systemVersion="23F79" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="Book" representedClassName="Book" syncable="YES" codeGenerationType="class">
+        <attribute name="author" optional="YES" attributeType="String"/>
+        <attribute name="coverImageURL" optional="YES" attributeType="String"/>
+        <attribute name="currentlyReading" optional="NO" attributeType="Boolean" defaultValue="NO" usesScalarValueType="YES"/>
+        <attribute name="dateAdded" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="genre" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isbn" optional="YES" attributeType="String"/>
+        <attribute name="isRead" optional="NO" attributeType="Boolean" defaultValue="NO" usesScalarValueType="YES"/>
+        <attribute name="libraryName" optional="YES" attributeType="String"/>
+        <attribute name="pageCount" optional="YES" attributeType="Integer 32" defaultValue="0" usesScalarValueType="YES"/>
+        <attribute name="personalNotes" optional="YES" attributeType="String"/>
+        <attribute name="publishedDate" optional="YES" attributeType="String"/>
+        <attribute name="rating" optional="YES" attributeType="Float" defaultValue="0.0" usesScalarValueType="YES"/>
+        <attribute name="size" optional="YES" attributeType="String"/>
+        <attribute name="summary" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="NO" attributeType="String"/>
     </entity>
-    <elements>
-        <element name="Item" positionX="-63" positionY="-18" width="128" height="44"/>
-    </elements>
 </model>
