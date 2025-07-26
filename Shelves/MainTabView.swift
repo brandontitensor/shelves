@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab = 0
+    @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
         TabView(selection: $selectedTab) {

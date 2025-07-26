@@ -3,6 +3,7 @@ import CoreData
 
 struct SearchView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var searchText = ""
     @State private var searchCategory: SearchCategory = .all
     @State private var recentSearches: [String] = []
@@ -32,6 +33,17 @@ struct SearchView: View {
     
     private var searchResults: [Book] {
         guard !searchText.isEmpty else { return [] }
+        
+        // Handle special filter cases
+        if searchText == "currently_reading_filter" {
+            return allBooks.filter { $0.currentlyReading }
+        } else if searchText == "unread_books_filter" {
+            return allBooks.filter { !$0.isRead && !$0.currentlyReading }
+        } else if searchText == "favorites_filter" {
+            return allBooks.filter { $0.rating >= 4.0 }
+        } else if searchText == "*" {
+            return Array(allBooks)
+        }
         
         return allBooks.filter { book in
             switch searchCategory {
@@ -241,7 +253,8 @@ struct SearchView: View {
                     icon: "book.open",
                     color: ShelvesDesign.Colors.forestGreen
                 ) {
-                    // Navigate to currently reading books
+                    searchCategory = .all
+                    searchText = "currently_reading_filter"
                 }
                 
                 QuickAccessCard(
@@ -250,7 +263,8 @@ struct SearchView: View {
                     icon: "book.closed",
                     color: ShelvesDesign.Colors.navy
                 ) {
-                    // Navigate to unread books
+                    searchCategory = .all
+                    searchText = "unread_books_filter"
                 }
                 
                 QuickAccessCard(
@@ -259,7 +273,8 @@ struct SearchView: View {
                     icon: "star.fill",
                     color: ShelvesDesign.Colors.antiqueGold
                 ) {
-                    // Navigate to highly rated books
+                    searchCategory = .all
+                    searchText = "favorites_filter"
                 }
             }
         }

@@ -1,49 +1,26 @@
 import SwiftUI
+import CoreData
 
 struct SettingsView: View {
-    @State private var enableNotifications = true
-    @State private var autoBackup = true
-    @State private var selectedTheme: AppTheme = .classic
+    @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var themeManager = ThemeManager.shared
     @State private var exportFormat: ExportFormat = .csv
+    @State private var showingLibraryManagement = false
+    @State private var showingDuplicateDetection = false
+    @State private var showingExportSheet = false
+    @State private var showingBackupAlert = false
+    @State private var isExporting = false
+    @State private var showingTestDataAlert = false
+    @State private var showingClearDataAlert = false
     
-    enum AppTheme: String, CaseIterable {
-        case classic = "Classic Library"
-        case midnight = "Midnight Study"
-        case autumn = "Autumn Reading"
-        
-        var description: String {
-            switch self {
-            case .classic: return "Warm woods and golden light"
-            case .midnight: return "Cool blues and brass accents"
-            case .autumn: return "Rich oranges and deep reds"
-            }
-        }
-        
-        var previewColors: [Color] {
-            switch self {
-            case .classic:
-                return [ShelvesDesign.Colors.antiqueGold, ShelvesDesign.Colors.chestnut, ShelvesDesign.Colors.burgundy]
-            case .midnight:
-                return [Color.blue, Color.indigo, Color.cyan]
-            case .autumn:
-                return [Color.orange, Color.red, Color.yellow]
-            }
-        }
-    }
+    // Development settings - can be disabled for production
+    private let isDevelopmentMode = true
     
-    enum ExportFormat: String, CaseIterable {
-        case csv = "CSV"
-        case json = "JSON"
-        case pdf = "PDF"
-        
-        var description: String {
-            switch self {
-            case .csv: return "Spreadsheet format"
-            case .json: return "Data interchange format"
-            case .pdf: return "Printable document"
-            }
-        }
-    }
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Book.title, ascending: true)],
+        animation: .default)
+    private var books: FetchedResults<Book>
+    
     
     var body: some View {
         NavigationStack {
@@ -55,6 +32,11 @@ struct SettingsView: View {
                             librarySection
                             dataSection
                             aboutSection
+                            
+                            // Development section (only shown in development mode)
+                            if isDevelopmentMode {
+                                developmentSection
+                            }
                         }
                         .padding(ShelvesDesign.Spacing.md)
                         .padding(.bottom, ShelvesDesign.Spacing.xl)
@@ -83,9 +65,9 @@ struct SettingsView: View {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
                             ThemeOption(
                                 theme: theme,
-                                isSelected: selectedTheme == theme
+                                isSelected: themeManager.currentTheme == theme
                             ) {
-                                selectedTheme = theme
+                                themeManager.currentTheme = theme
                             }
                         }
                     }
@@ -98,7 +80,7 @@ struct SettingsView: View {
                 SettingsToggle(
                     title: "Reading Reminders",
                     subtitle: "Get gentle nudges to read",
-                    isOn: $enableNotifications
+                    isOn: $themeManager.notificationsEnabled
                 )
             }
         }
@@ -117,7 +99,7 @@ struct SettingsView: View {
                     subtitle: "Add or edit your library locations",
                     icon: "house.fill"
                 ) {
-                    // Navigate to library management
+                    showingLibraryManagement = true
                 }
                 
                 SettingsButton(
@@ -125,7 +107,8 @@ struct SettingsView: View {
                     subtitle: "Bulk import from file or service",
                     icon: "square.and.arrow.down"
                 ) {
-                    // Navigate to import options
+                    // TODO: Implement import functionality
+                    print("Import books tapped")
                 }
                 
                 SettingsButton(
@@ -133,7 +116,7 @@ struct SettingsView: View {
                     subtitle: "Find and merge duplicate entries",
                     icon: "doc.on.doc"
                 ) {
-                    // Run duplicate detection
+                    showingDuplicateDetection = true
                 }
             }
         }
@@ -150,7 +133,7 @@ struct SettingsView: View {
                 SettingsToggle(
                     title: "Auto Backup",
                     subtitle: "Automatically backup to iCloud",
-                    isOn: $autoBackup
+                    isOn: $themeManager.autoBackupEnabled
                 )
                 
                 Divider()
@@ -179,7 +162,7 @@ struct SettingsView: View {
                     subtitle: "Download your complete collection",
                     icon: "square.and.arrow.up"
                 ) {
-                    // Export library
+                    showingExportSheet = true
                 }
                 
                 SettingsButton(
@@ -187,7 +170,7 @@ struct SettingsView: View {
                     subtitle: "Create manual backup",
                     icon: "icloud.and.arrow.up"
                 ) {
-                    // Manual backup
+                    performManualBackup()
                 }
             }
         }
@@ -206,7 +189,7 @@ struct SettingsView: View {
                     subtitle: "Check for updates",
                     icon: "arrow.triangle.2.circlepath"
                 ) {
-                    // Check for updates
+                    checkForUpdates()
                 }
                 
                 SettingsButton(
@@ -214,7 +197,7 @@ struct SettingsView: View {
                     subtitle: "Get help using Shelves",
                     icon: "questionmark.circle"
                 ) {
-                    // Open help
+                    openHelpAndSupport()
                 }
                 
                 SettingsButton(
@@ -222,7 +205,7 @@ struct SettingsView: View {
                     subtitle: "How we protect your data",
                     icon: "hand.raised"
                 ) {
-                    // Open privacy policy
+                    openPrivacyPolicy()
                 }
                 
                 SettingsButton(
@@ -230,9 +213,187 @@ struct SettingsView: View {
                     subtitle: "Share your thoughts on the App Store",
                     icon: "star"
                 ) {
-                    // Rate app
+                    rateApp()
                 }
             }
+        }
+        .sheet(isPresented: $showingLibraryManagement) {
+            LibraryManagementView()
+                .environment(\.managedObjectContext, viewContext)
+        }
+        .sheet(isPresented: $showingDuplicateDetection) {
+            DuplicateDetectionView()
+                .environment(\.managedObjectContext, viewContext)
+        }
+        .confirmationDialog("Export Library", isPresented: $showingExportSheet) {
+            Button("Export as CSV") { exportLibrary(format: .csv) }
+            Button("Export as JSON") { exportLibrary(format: .json) }
+            Button("Export as PDF") { exportLibrary(format: .pdf) }
+            Button("Cancel", role: .cancel) { }
+        }
+        .alert("Backup Complete", isPresented: $showingBackupAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Your library has been backed up successfully.")
+        }
+    }
+    
+    private var developmentSection: some View {
+        SettingsCard(
+            title: "Development Tools",
+            subtitle: "Testing and development utilities",
+            icon: "hammer.fill",
+            iconColor: Color.orange
+        ) {
+            VStack(spacing: ShelvesDesign.Spacing.md) {
+                // Book count display
+                HStack {
+                    VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
+                        Text("Current Library Size")
+                            .font(ShelvesDesign.Typography.labelLarge)
+                            .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        
+                        Text("\(books.count) books in library")
+                            .font(ShelvesDesign.Typography.bodySmall)
+                            .foregroundColor(ShelvesDesign.Colors.sepia)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.vertical, ShelvesDesign.Spacing.sm)
+                
+                Divider()
+                    .background(ShelvesDesign.Colors.paleBeige)
+                
+                SettingsButton(
+                    title: "Populate Test Library",
+                    subtitle: "Add 100 sample books for testing",
+                    icon: "books.vertical"
+                ) {
+                    showingTestDataAlert = true
+                }
+                
+                SettingsButton(
+                    title: "Clear All Books",
+                    subtitle: "Remove all books from library",
+                    icon: "trash"
+                ) {
+                    showingClearDataAlert = true
+                }
+                
+                // Library statistics
+                VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
+                    Text("Quick Stats")
+                        .font(ShelvesDesign.Typography.headlineSmall)
+                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    
+                    let readBooks = books.filter { $0.isRead }.count
+                    let currentlyReading = books.filter { $0.currentlyReading }.count
+                    let genres = Set(books.compactMap { $0.genre }).count
+                    let libraries = Set(books.compactMap { $0.libraryName }).count
+                    
+                    HStack {
+                        StatItem(label: "Read", value: "\(readBooks)")
+                        StatItem(label: "Reading", value: "\(currentlyReading)")
+                        StatItem(label: "Genres", value: "\(genres)")
+                        StatItem(label: "Libraries", value: "\(libraries)")
+                    }
+                }
+            }
+        }
+        .alert("Populate Test Library", isPresented: $showingTestDataAlert) {
+            Button("Populate", role: .destructive) {
+                populateTestLibrary()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will replace all existing books with 100 test books across various genres. This action cannot be undone.")
+        }
+        .alert("Clear All Books", isPresented: $showingClearDataAlert) {
+            Button("Clear All", role: .destructive) {
+                clearAllBooks()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete all books from your library. This action cannot be undone.")
+        }
+    }
+    
+    // MARK: - Action Methods
+    
+    private func exportLibrary(format: ExportFormat) {
+        isExporting = true
+        
+        DispatchQueue.global(qos: .background).async {
+            let allBooks = Array(books)
+            if let fileURL = DataExportService.shared.exportLibrary(books: allBooks, format: format) {
+                DispatchQueue.main.async {
+                    self.isExporting = false
+                    self.shareFile(url: fileURL)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isExporting = false
+                    print("Export failed")
+                }
+            }
+        }
+    }
+    
+    private func shareFile(url: URL) {
+        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            window.rootViewController?.present(activityVC, animated: true)
+        }
+    }
+    
+    private func performManualBackup() {
+        DataExportService.shared.backupToiCloud()
+        showingBackupAlert = true
+    }
+    
+    private func checkForUpdates() {
+        if let url = URL(string: "https://apps.apple.com/app/id1234567890") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func openHelpAndSupport() {
+        if let url = URL(string: "mailto:support@shelves.app?subject=Shelves%20Support") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func openPrivacyPolicy() {
+        if let url = URL(string: "https://shelves.app/privacy") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func rateApp() {
+        if let url = URL(string: "https://apps.apple.com/app/id1234567890?action=write-review") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    // MARK: - Development Methods
+    
+    private func populateTestLibrary() {
+        TestDataGenerator.shared.populateTestLibrary(context: viewContext)
+    }
+    
+    private func clearAllBooks() {
+        let request: NSFetchRequest<NSFetchRequestResult> = Book.fetchRequest()
+        let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
+        
+        do {
+            try viewContext.execute(deleteRequest)
+            try viewContext.save()
+            print("Successfully cleared all books")
+        } catch {
+            print("Failed to clear books: \(error)")
         }
     }
 }
@@ -346,7 +507,7 @@ struct SettingsToggle: View {
 }
 
 struct ThemeOption: View {
-    let theme: SettingsView.AppTheme
+    let theme: AppTheme
     let isSelected: Bool
     let action: () -> Void
     
@@ -391,7 +552,7 @@ struct ThemeOption: View {
 }
 
 struct ExportFormatOption: View {
-    let format: SettingsView.ExportFormat
+    let format: ExportFormat
     let isSelected: Bool
     let action: () -> Void
     
@@ -426,6 +587,25 @@ struct ExportFormatOption: View {
     }
 }
 
+struct StatItem: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: ShelvesDesign.Spacing.xs) {
+            Text(value)
+                .font(ShelvesDesign.Typography.headlineSmall)
+                .foregroundColor(ShelvesDesign.Colors.antiqueGold)
+            
+            Text(label)
+                .font(ShelvesDesign.Typography.bodySmall)
+                .foregroundColor(ShelvesDesign.Colors.sepia)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 #Preview {
     SettingsView()
+        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

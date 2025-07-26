@@ -3,6 +3,7 @@ import CoreData
 
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var themeManager: ThemeManager
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)],

@@ -20,6 +20,11 @@ struct AddBookView: View {
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var libraryName = "Home Library"
+    @State private var showingSaveConfirmation = false
+    @State private var showingDuplicateAlert = false
+    @State private var duplicateBooks: [Book] = []
+    @State private var coverImageURL: String?
+    @State private var showingCoverOptions = false
     
     #if canImport(UIKit)
     @State private var showingImagePicker = false
@@ -68,14 +73,71 @@ struct AddBookView: View {
                 }
             }
             #endif
+            .alert("Book Saved Successfully!", isPresented: $showingSaveConfirmation) {
+                Button("OK") {
+                    dismiss()
+                }
+            } message: {
+                Text("Your book has been added to your library.")
+            }
+            .alert("Possible Duplicate Book", isPresented: $showingDuplicateAlert) {
+                Button("Add Anyway") {
+                    performSave()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("You may already have this book in your library:\\n\\n\\(duplicateBooks.map { \"• \\($0.title ?? \"Unknown\") by \\($0.author ?? \"Unknown\")\" }.joined(separator: \"\\n\"))")
+            }
+            .confirmationDialog("Add Book Cover", isPresented: $showingCoverOptions, titleVisibility: .visible) {
+                #if canImport(UIKit)
+                Button("Take Photo") {
+                    showingImagePicker = true
+                }
+                #endif
+                Button("Cancel", role: .cancel) { }
+            }
         }
     }
     
     private var basicInfoSection: some View {
         Section("Book Information") {
+            TextField("ISBN (enter to auto-fill)", text: $isbnText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onSubmit {
+                    if !isbnText.isEmpty {
+                        fetchBookData(isbn: isbnText)
+                    }
+                }
+            
+            // Book Cover Section
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Book Cover")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Button("Add Cover") {
+                        showingCoverOptions = true
+                    }
+                    .buttonStyle(.bordered)
+                }
+                
+                Spacer()
+                
+                // Cover preview placeholder for now
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        Image(systemName: "book.closed")
+                            .foregroundColor(.gray)
+                    )
+                    .frame(width: 50, height: 70)
+                    .cornerRadius(8)
+            }
+            
             TextField("Title *", text: $title)
             TextField("Author", text: $author)
-            TextField("ISBN", text: $isbnText)
             TextField("Published Date", text: $publishedDate)
             TextField("Page Count", text: $pageCount)
                 .keyboardType(.numberPad)
@@ -163,6 +225,49 @@ struct AddBookView: View {
     }
     
     private func saveBook() {
+        // Check for duplicates first
+        checkForDuplicates { shouldProceed in
+            if shouldProceed {
+                performSave()
+            }
+        }
+    }
+    
+    private func checkForDuplicates(completion: @escaping (Bool) -> Void) {
+        let request: NSFetchRequest<Book> = Book.fetchRequest()
+        
+        var predicates: [NSPredicate] = []
+        
+        // Check for same title and author
+        if !title.isEmpty && !author.isEmpty {
+            predicates.append(NSPredicate(format: "title CONTAINS[cd] %@ AND author CONTAINS[cd] %@", title, author))
+        }
+        
+        // Check for same ISBN if provided
+        if !isbnText.isEmpty {
+            predicates.append(NSPredicate(format: "isbn == %@", isbnText))
+        }
+        
+        if !predicates.isEmpty {
+            request.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
+            
+            do {
+                let results = try viewContext.fetch(request)
+                if !results.isEmpty {
+                    duplicateBooks = results
+                    showingDuplicateAlert = true
+                    completion(false)
+                    return
+                }
+            } catch {
+                print("Error checking for duplicates: \(error)")
+            }
+        }
+        
+        completion(true)
+    }
+    
+    private func performSave() {
         let newBook = Book(context: viewContext)
         newBook.id = UUID()
         newBook.title = title
@@ -178,10 +283,11 @@ struct AddBookView: View {
         newBook.dateAdded = Date()
         newBook.libraryName = libraryName.isEmpty ? "Home Library" : libraryName
         newBook.isbn = isbnText.isEmpty ? nil : isbnText
+        newBook.coverImageURL = coverImageURL
         
         do {
             try viewContext.save()
-            dismiss()
+            showingSaveConfirmation = true
         } catch {
             errorMessage = "Failed to save book: \(error.localizedDescription)"
         }

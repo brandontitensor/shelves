@@ -3,6 +3,7 @@ import CoreData
 
 struct LibraryView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var searchText = ""
     @State private var viewMode: ViewMode = .covers
     @State private var sortOption: SortOption = .dateAdded
@@ -65,7 +66,21 @@ struct LibraryView: View {
             }
         }
         
-        return result
+        // Apply sorting
+        return result.sorted { lhs, rhs in
+            switch sortOption {
+            case .dateAdded:
+                return (lhs.dateAdded ?? Date.distantPast) > (rhs.dateAdded ?? Date.distantPast)
+            case .title:
+                return (lhs.title ?? "") < (rhs.title ?? "")
+            case .author:
+                return (lhs.author ?? "") < (rhs.author ?? "")
+            case .dateRead:
+                let lhsDate = lhs.isRead ? (lhs.dateAdded ?? Date.distantPast) : Date.distantPast
+                let rhsDate = rhs.isRead ? (rhs.dateAdded ?? Date.distantPast) : Date.distantPast
+                return lhsDate > rhsDate
+            }
+        }
     }
     
     private var availableRooms: [String] {

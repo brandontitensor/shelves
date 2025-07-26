@@ -7,30 +7,33 @@ struct ShelvesDesign {
     
     // MARK: - Color Palette
     struct Colors {
-        // Main backgrounds
-        static let parchment = Color(red: 0.97, green: 0.96, blue: 0.94) // #F8F5EF
-        static let ivory = Color(red: 0.99, green: 0.99, blue: 0.96) // #FCFCF5
-        static let paleBeige = Color(red: 0.96, green: 0.94, blue: 0.90) // #F5F0E6
+        // Dynamic colors that change with theme
+        static var primary: Color { ThemeManager.shared.currentTheme.colors.primary }
+        static var secondary: Color { ThemeManager.shared.currentTheme.colors.secondary }
+        static var accent: Color { ThemeManager.shared.currentTheme.colors.accent }
+        static var background: Color { ThemeManager.shared.currentTheme.colors.background }
+        static var surface: Color { ThemeManager.shared.currentTheme.colors.surface }
+        static var text: Color { ThemeManager.shared.currentTheme.colors.text }
+        static var textSecondary: Color { ThemeManager.shared.currentTheme.colors.textSecondary }
         
-        // Wood tones
-        static let mahogany = Color(red: 0.29, green: 0.18, blue: 0.09) // #4B2E16
-        static let chestnut = Color(red: 0.57, green: 0.37, blue: 0.22) // #915E38
-        static let walnut = Color(red: 0.45, green: 0.31, blue: 0.20) // #734F33
+        // Theme-aware aliases for existing color usage
+        static var parchment: Color { background }
+        static var ivory: Color { surface }
+        static var paleBeige: Color { surface.opacity(0.8) }
+        static var antiqueGold: Color { primary }
+        static var chestnut: Color { secondary }
+        static var burgundy: Color { accent }
+        static var warmBlack: Color { text }
+        static var sepia: Color { textSecondary }
+        static var slateGray: Color { textSecondary.opacity(0.8) }
         
-        // Accent colors
-        static let antiqueGold = Color(red: 0.79, green: 0.64, blue: 0.26) // #C9A442
-        static let warmGold = Color(red: 0.85, green: 0.70, blue: 0.30) // #D9B34D
-        
-        // Book colors
-        static let burgundy = Color(red: 0.50, green: 0.11, blue: 0.10) // #801B1A
+        // Static book spine colors (these should remain consistent across themes)
         static let forestGreen = Color(red: 0.24, green: 0.31, blue: 0.18) // #3D4F2F
         static let navy = Color(red: 0.14, green: 0.20, blue: 0.29) // #24324A
         static let deepMaroon = Color(red: 0.42, green: 0.15, blue: 0.15) // #6B2626
-        
-        // Text colors
-        static let slateGray = Color(red: 0.25, green: 0.25, blue: 0.25) // #404040
-        static let sepia = Color(red: 0.35, green: 0.29, blue: 0.24) // #594A3D
-        static let warmBlack = Color(red: 0.12, green: 0.10, blue: 0.08) // #1F1A14
+        static let mahogany = Color(red: 0.29, green: 0.18, blue: 0.09) // #4B2E16
+        static let walnut = Color(red: 0.45, green: 0.31, blue: 0.20) // #734F33
+        static let warmGold = Color(red: 0.85, green: 0.70, blue: 0.30) // #D9B34D
         
         // UI States
         static let softShadow = Color.black.opacity(0.1)
@@ -115,10 +118,13 @@ extension View {
             y: ShelvesDesign.Shadows.soft.y
         )
     }
+    
 }
 
 // MARK: - Background Textures
 struct BookshelfBackground: View {
+    @EnvironmentObject var themeManager: ThemeManager
+    
     var body: some View {
         LinearGradient(
             colors: [
@@ -148,6 +154,8 @@ struct BookshelfBackground: View {
 }
 
 struct WarmCardBackground: View {
+    @EnvironmentObject var themeManager: ThemeManager
+    
     var body: some View {
         RoundedRectangle(cornerRadius: ShelvesDesign.CornerRadius.medium)
             .fill(ShelvesDesign.Colors.ivory)

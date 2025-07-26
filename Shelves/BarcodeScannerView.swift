@@ -72,6 +72,28 @@ class BarcodeScannerViewController: UIViewController {
     private func setupCamera() {
         captureSession = AVCaptureSession()
         
+        // Check camera permissions first
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .denied, .restricted:
+            delegate?.didFailWithError(NSError(domain: "Camera", code: 0, userInfo: [NSLocalizedDescriptionKey: "Camera access denied. Please enable in Settings."]))
+            return
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self.setupCamera()
+                    } else {
+                        self.delegate?.didFailWithError(NSError(domain: "Camera", code: 0, userInfo: [NSLocalizedDescriptionKey: "Camera access required to scan barcodes"]))
+                    }
+                }
+            }
+            return
+        case .authorized:
+            break
+        @unknown default:
+            break
+        }
+        
         guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
             delegate?.didFailWithError(NSError(domain: "Camera", code: 1, userInfo: [NSLocalizedDescriptionKey: "Camera not available"]))
             return
