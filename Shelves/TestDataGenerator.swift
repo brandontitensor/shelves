@@ -140,51 +140,86 @@ class TestDataGenerator {
         // Clear existing books first
         clearAllBooks(context: context)
         
-        // Add all test books
-        for bookData in testBooks {
-            let book = Book(context: context)
-            book.id = UUID()
-            book.title = bookData.title
-            book.author = bookData.author
-            book.genre = bookData.genre
-            book.isbn = bookData.isbn
-            book.publishedDate = bookData.publishedDate
-            book.pageCount = bookData.pageCount ?? 0
-            book.rating = bookData.rating
-            book.isRead = bookData.isRead
-            book.libraryName = bookData.library
-            book.dateAdded = Date().addingTimeInterval(TimeInterval.random(in: -31536000...0)) // Random date within last year
-            book.size = ["Pocket", "Mass Market", "Trade Paperback", "Hardcover", "Large Print"].randomElement() ?? "Trade Paperback"
-            
-            // Add some random personal notes for read books
-            if bookData.isRead && Bool.random() {
-                let notes = [
-                    "Really enjoyed this one!",
-                    "Great character development",
-                    "Couldn't put it down",
-                    "Beautiful writing style",
-                    "Will definitely re-read",
-                    "Highly recommend",
-                    "Made me think differently",
-                    "Perfect beach read",
-                    "A classic for a reason",
-                    "Life-changing book"
-                ]
-                book.personalNotes = notes.randomElement()
-            }
-            
-            // Set some books as currently reading
-            if !bookData.isRead && Int.random(in: 1...10) <= 2 {
-                book.currentlyReading = true
-            }
-        }
+        print("📚 Starting to populate test library with cover art...")
         
-        // Save the context
-        do {
-            try context.save()
-            print("Successfully populated test library with \(testBooks.count) books")
-        } catch {
-            print("Failed to save test books: \(error)")
+        // Add all test books asynchronously to fetch cover art
+        Task {
+            for (index, bookData) in testBooks.enumerated() {
+                await MainActor.run {
+                    let book = Book(context: context)
+                    book.id = UUID()
+                    book.title = bookData.title
+                    book.author = bookData.author
+                    book.genre = bookData.genre
+                    book.isbn = bookData.isbn
+                    book.publishedDate = bookData.publishedDate
+                    book.pageCount = bookData.pageCount ?? 0
+                    book.rating = bookData.rating
+                    book.isRead = bookData.isRead
+                    book.libraryName = bookData.library
+                    book.dateAdded = Date().addingTimeInterval(TimeInterval.random(in: -31536000...0)) // Random date within last year
+                    book.size = ["Pocket", "Mass Market", "Trade Paperback", "Hardcover", "Large Print"].randomElement() ?? "Trade Paperback"
+                    
+                    // Add some random personal notes for read books
+                    if bookData.isRead && Bool.random() {
+                        let notes = [
+                            "Really enjoyed this one!",
+                            "Great character development",
+                            "Couldn't put it down",
+                            "Beautiful writing style",
+                            "Will definitely re-read",
+                            "Highly recommend",
+                            "Made me think differently",
+                            "Perfect beach read",
+                            "A classic for a reason",
+                            "Life-changing book"
+                        ]
+                        book.personalNotes = notes.randomElement()
+                    }
+                    
+                    // Set some books as currently reading
+                    if !bookData.isRead && Int.random(in: 1...10) <= 2 {
+                        book.currentlyReading = true
+                    }
+                }
+                
+                // Fetch cover art if ISBN is available
+                if let isbn = bookData.isbn {
+                    do {
+                        if let fetchedBookData = try await OpenLibraryService.shared.fetchBookData(isbn: isbn) {
+                            await MainActor.run {
+                                // Find the book we just created and update its cover
+                                let request = Book.fetchRequest()
+                                request.predicate = NSPredicate(format: "isbn == %@", isbn)
+                                
+                                if let books = try? context.fetch(request), let bookToUpdate = books.first {
+                                    bookToUpdate.coverImageURL = fetchedBookData.coverImageURL
+                                    print("🖼️ Fetched cover for: \(bookData.title)")
+                                }
+                            }
+                        } else {
+                            print("⚠️ No cover found for: \(bookData.title)")
+                        }
+                    } catch {
+                        print("❌ Failed to fetch cover for \(bookData.title): \(error)")
+                    }
+                }
+                
+                // Add a small delay to avoid overwhelming the API
+                if index < testBooks.count - 1 {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                }
+            }
+            
+            // Save the context after all books are added
+            await MainActor.run {
+                do {
+                    try context.save()
+                    print("✅ Successfully populated test library with \(testBooks.count) books and cover art")
+                } catch {
+                    print("❌ Failed to save test books: \(error)")
+                }
+            }
         }
     }
     

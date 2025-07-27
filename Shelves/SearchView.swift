@@ -500,20 +500,7 @@ struct SearchResultRow: View {
     var body: some View {
         HStack(spacing: ShelvesDesign.Spacing.md) {
             // Book cover/spine
-            AsyncImage(url: book.coverImageURL.flatMap(URL.init)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                BookSpinePlaceholder(
-                    title: book.title ?? "",
-                    author: book.author ?? "",
-                    color: bookSpineColor(for: book)
-                )
-            }
-            .frame(width: 40, height: 56)
-            .clipped()
-            .cornerRadius(ShelvesDesign.CornerRadius.small)
+            BookCoverImage(book: book, style: .list)
             
             // Book details
             VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {

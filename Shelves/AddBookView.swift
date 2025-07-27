@@ -207,7 +207,9 @@ struct AddBookView: View {
                         publishedDate = bookData.publishedDate ?? ""
                         pageCount = bookData.pageCount.map(String.init) ?? ""
                         summary = bookData.summary ?? ""
+                        coverImageURL = bookData.coverImageURL
                         isLoading = false
+                        print("🖼️ Fetched book data and cover for: \(bookData.title)")
                     }
                 } else {
                     await MainActor.run {

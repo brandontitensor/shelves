@@ -36,22 +36,7 @@ struct BookDetailView: View {
     private var bookHeaderSection: some View {
         VStack(spacing: 16) {
             HStack(alignment: .top, spacing: 16) {
-                AsyncImage(url: book.coverImageURL.flatMap(URL.init)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Image(systemName: "book.closed")
-                                .font(.system(size: 40))
-                                .foregroundColor(.secondary)
-                        )
-                }
-                .frame(width: 120, height: 180)
-                .cornerRadius(12)
-                .shadow(radius: 4)
+                BookCoverImage(book: book, style: .detail)
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(book.title ?? "Unknown Title")

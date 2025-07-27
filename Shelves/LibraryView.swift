@@ -284,21 +284,7 @@ struct BookCoverCard: View {
     var body: some View {
         VStack(spacing: ShelvesDesign.Spacing.sm) {
             // Book cover
-            AsyncImage(url: book.coverImageURL.flatMap(URL.init)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                BookSpinePlaceholder(
-                    title: book.title ?? "",
-                    author: book.author ?? "",
-                    color: bookSpineColor(for: book)
-                )
-            }
-            .frame(height: 140)
-            .clipped()
-            .cornerRadius(ShelvesDesign.CornerRadius.medium)
-            .bookShadow()
+            BookCoverImage(book: book, style: .grid)
             
             // Book info
             VStack(spacing: ShelvesDesign.Spacing.xs) {

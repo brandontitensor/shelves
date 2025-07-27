@@ -139,21 +139,7 @@ struct BookCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: book.coverImageURL.flatMap(URL.init)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } placeholder: {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray5))
-                    .overlay(
-                        Image(systemName: "book.closed")
-                            .foregroundColor(.secondary)
-                            .font(.title2)
-                    )
-            }
-            .frame(height: 120)
-            .cornerRadius(8)
+            BookCoverImage(book: book, height: 120, cornerRadius: 8)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(book.title ?? "Unknown Title")
@@ -224,21 +210,7 @@ struct BookRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: book.coverImageURL.flatMap(URL.init)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } placeholder: {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(.systemGray5))
-                    .overlay(
-                        Image(systemName: "book.closed")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
-                    )
-            }
-            .frame(width: 40, height: 60)
-            .cornerRadius(4)
+            BookCoverImage(book: book, style: .list)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(book.title ?? "Unknown Title")

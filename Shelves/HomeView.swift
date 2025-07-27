@@ -195,15 +195,12 @@ struct BookCarouselCard: View {
     }
     
     private func bookCoverSection(geometry: GeometryProxy) -> some View {
-        AsyncImage(url: book.coverImageURL.flatMap(URL.init)) { image in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } placeholder: {
-            BookPlaceholder()
-        }
-        .frame(maxHeight: geometry.size.height * 0.5)
-        .bookShadow()
+        BookCoverImage(
+            book: book, 
+            height: geometry.size.height * 0.5, 
+            cornerRadius: ShelvesDesign.CornerRadius.medium,
+            contentMode: .fit
+        )
         .padding(.horizontal, ShelvesDesign.Spacing.xl)
     }
     
