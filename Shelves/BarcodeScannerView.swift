@@ -3,7 +3,136 @@ import SwiftUI
 import UIKit
 import AVFoundation
 
-struct BarcodeScannerView: UIViewControllerRepresentable {
+struct BarcodeScannerView: View {
+    @Binding var scannedCode: String?
+    @Binding var isPresented: Bool
+    @State private var showingPermissionAlert = false
+    @State private var permissionDenied = false
+    
+    var body: some View {
+        ZStack {
+            if permissionDenied {
+                permissionDeniedView
+            } else {
+                ScannerViewControllerRepresentable(scannedCode: $scannedCode, isPresented: $isPresented)
+                    .ignoresSafeArea()
+                
+                // Overlay UI
+                VStack {
+                    // Top bar
+                    HStack {
+                        Spacer()
+                        Button("Cancel") {
+                            isPresented = false
+                        }
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(8)
+                    }
+                    .padding()
+                    
+                    Spacer()
+                    
+                    // Scanning frame
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white, lineWidth: 3)
+                        .frame(width: 250, height: 150)
+                        .overlay(
+                            VStack {
+                                Spacer()
+                                Text("Position barcode within frame")
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(8)
+                            }
+                            .offset(y: 80)
+                        )
+                    
+                    Spacer()
+                    
+                    // Bottom instruction
+                    Text("Point your camera at the barcode on the back of your book")
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(12)
+                        .padding()
+                }
+            }
+        }
+        .background(Color.black)
+        .onAppear {
+            checkCameraPermission()
+        }
+        .alert("Camera Access Required", isPresented: $showingPermissionAlert) {
+            Button("Settings") {
+                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            }
+            Button("Cancel") {
+                isPresented = false
+            }
+        } message: {
+            Text("Please allow camera access in Settings to scan barcodes.")
+        }
+    }
+    
+    private var permissionDeniedView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.gray)
+            
+            Text("Camera Access Required")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("To scan barcodes, please allow camera access in Settings.")
+                .multilineTextAlignment(.center)
+                .foregroundColor(.gray)
+            
+            Button("Open Settings") {
+                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            
+            Button("Cancel") {
+                isPresented = false
+            }
+            .foregroundColor(.gray)
+        }
+        .padding()
+    }
+    
+    private func checkCameraPermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .denied, .restricted:
+            permissionDenied = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if !granted {
+                        permissionDenied = true
+                    }
+                }
+            }
+        case .authorized:
+            permissionDenied = false
+        @unknown default:
+            permissionDenied = true
+        }
+    }
+}
+
+struct ScannerViewControllerRepresentable: UIViewControllerRepresentable {
     @Binding var scannedCode: String?
     @Binding var isPresented: Bool
     
@@ -20,19 +149,24 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
     }
     
     class Coordinator: NSObject, BarcodeScannerDelegate {
-        let parent: BarcodeScannerView
+        let parent: ScannerViewControllerRepresentable
         
-        init(_ parent: BarcodeScannerView) {
+        init(_ parent: ScannerViewControllerRepresentable) {
             self.parent = parent
         }
         
         func didScanBarcode(_ code: String) {
-            parent.scannedCode = code
-            parent.isPresented = false
+            DispatchQueue.main.async {
+                self.parent.scannedCode = code
+                self.parent.isPresented = false
+            }
         }
         
         func didFailWithError(_ error: Error) {
-            parent.isPresented = false
+            DispatchQueue.main.async {
+                print("Scanner error: \(error.localizedDescription)")
+                // Don't close on error, let user try again
+            }
         }
     }
 }
@@ -46,56 +180,55 @@ class BarcodeScannerViewController: UIViewController {
     weak var delegate: BarcodeScannerDelegate?
     private var captureSession: AVCaptureSession!
     private var previewLayer: AVCaptureVideoPreviewLayer!
+    private var hasScanned = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = UIColor.black
         setupCamera()
-        setupUI()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        if !captureSession.isRunning {
-            DispatchQueue.global(qos: .background).async {
-                self.captureSession.startRunning()
-            }
-        }
+        hasScanned = false
+        startSession()
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        if captureSession.isRunning {
-            captureSession.stopRunning()
+        stopSession()
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.layer.bounds
+    }
+    
+    private func startSession() {
+        guard let session = captureSession, !session.isRunning else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            session.startRunning()
+        }
+    }
+    
+    private func stopSession() {
+        guard let session = captureSession, session.isRunning else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            session.stopRunning()
         }
     }
     
     private func setupCamera() {
-        captureSession = AVCaptureSession()
-        
         // Check camera permissions first
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .denied, .restricted:
-            delegate?.didFailWithError(NSError(domain: "Camera", code: 0, userInfo: [NSLocalizedDescriptionKey: "Camera access denied. Please enable in Settings."]))
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
+            print("Camera not authorized")
             return
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                DispatchQueue.main.async {
-                    if granted {
-                        self.setupCamera()
-                    } else {
-                        self.delegate?.didFailWithError(NSError(domain: "Camera", code: 0, userInfo: [NSLocalizedDescriptionKey: "Camera access required to scan barcodes"]))
-                    }
-                }
-            }
-            return
-        case .authorized:
-            break
-        @unknown default:
-            break
         }
         
+        captureSession = AVCaptureSession()
+        
         guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
-            delegate?.didFailWithError(NSError(domain: "Camera", code: 1, userInfo: [NSLocalizedDescriptionKey: "Camera not available"]))
+            print("Camera not available")
             return
         }
         
@@ -104,14 +237,14 @@ class BarcodeScannerViewController: UIViewController {
         do {
             videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
         } catch {
-            delegate?.didFailWithError(error)
+            print("Error creating video input: \(error)")
             return
         }
         
         if captureSession.canAddInput(videoInput) {
             captureSession.addInput(videoInput)
         } else {
-            delegate?.didFailWithError(NSError(domain: "Camera", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not add video input"]))
+            print("Could not add video input")
             return
         }
         
@@ -121,9 +254,12 @@ class BarcodeScannerViewController: UIViewController {
             captureSession.addOutput(metadataOutput)
             
             metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-            metadataOutput.metadataObjectTypes = [.ean8, .ean13, .pdf417]
+            // Support multiple barcode types common on books
+            metadataOutput.metadataObjectTypes = [
+                .ean8, .ean13, .pdf417, .code128, .code39, .code93, .upce
+            ]
         } else {
-            delegate?.didFailWithError(NSError(domain: "Camera", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not add metadata output"]))
+            print("Could not add metadata output")
             return
         }
         
@@ -132,58 +268,28 @@ class BarcodeScannerViewController: UIViewController {
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
     }
-    
-    private func setupUI() {
-        view.backgroundColor = UIColor.black
-        
-        let cancelButton = UIButton(type: .system)
-        cancelButton.setTitle("Cancel", for: .normal)
-        cancelButton.setTitleColor(.white, for: .normal)
-        cancelButton.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-        cancelButton.layer.cornerRadius = 8
-        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
-        
-        view.addSubview(cancelButton)
-        cancelButton.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            cancelButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            cancelButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            cancelButton.widthAnchor.constraint(equalToConstant: 80),
-            cancelButton.heightAnchor.constraint(equalToConstant: 40)
-        ])
-        
-        let instructionLabel = UILabel()
-        instructionLabel.text = "Point camera at book barcode"
-        instructionLabel.textColor = .white
-        instructionLabel.textAlignment = .center
-        instructionLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-        instructionLabel.layer.cornerRadius = 8
-        
-        view.addSubview(instructionLabel)
-        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -50),
-            instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            instructionLabel.widthAnchor.constraint(equalToConstant: 250),
-            instructionLabel.heightAnchor.constraint(equalToConstant: 40)
-        ])
-    }
-    
-    @objc private func cancelTapped() {
-        delegate?.didFailWithError(NSError(domain: "User", code: 0, userInfo: [NSLocalizedDescriptionKey: "User cancelled"]))
-    }
 }
 
 extension BarcodeScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        captureSession.stopRunning()
+        // Prevent multiple scans
+        guard !hasScanned else { return }
         
         if let metadataObject = metadataObjects.first {
             guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
             guard let stringValue = readableObject.stringValue else { return }
             
-            AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
-            delegate?.didScanBarcode(stringValue)
+            hasScanned = true
+            stopSession()
+            
+            // Provide haptic feedback
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            
+            // Small delay to ensure user sees the scan happened
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.delegate?.didScanBarcode(stringValue)
+            }
         }
     }
 }

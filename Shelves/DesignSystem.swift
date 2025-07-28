@@ -127,29 +127,55 @@ struct BookshelfBackground: View {
     
     var body: some View {
         LinearGradient(
-            colors: [
-                ShelvesDesign.Colors.parchment,
-                ShelvesDesign.Colors.paleBeige.opacity(0.3)
-            ],
+            colors: gradientColors,
             startPoint: .top,
             endPoint: .bottom
         )
         .overlay(
-            // Subtle wood grain texture effect
+            // Subtle texture effect based on theme
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [
-                            ShelvesDesign.Colors.chestnut.opacity(0.02),
-                            Color.clear,
-                            ShelvesDesign.Colors.mahogany.opacity(0.01)
-                        ],
+                        colors: textureColors,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
         )
         .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.3), value: themeManager.currentTheme)
+    }
+    
+    private var gradientColors: [Color] {
+        switch themeManager.currentTheme {
+        case .midnight:
+            return [
+                ShelvesDesign.Colors.background,
+                ShelvesDesign.Colors.surface
+            ]
+        default:
+            return [
+                ShelvesDesign.Colors.background,
+                ShelvesDesign.Colors.surface.opacity(0.8)
+            ]
+        }
+    }
+    
+    private var textureColors: [Color] {
+        switch themeManager.currentTheme {
+        case .midnight:
+            return [
+                ShelvesDesign.Colors.primary.opacity(0.03),
+                Color.clear,
+                ShelvesDesign.Colors.secondary.opacity(0.02)
+            ]
+        default:
+            return [
+                ShelvesDesign.Colors.secondary.opacity(0.02),
+                Color.clear,
+                ShelvesDesign.Colors.mahogany.opacity(0.01)
+            ]
+        }
     }
 }
 
@@ -158,7 +184,8 @@ struct WarmCardBackground: View {
     
     var body: some View {
         RoundedRectangle(cornerRadius: ShelvesDesign.CornerRadius.medium)
-            .fill(ShelvesDesign.Colors.ivory)
+            .fill(ShelvesDesign.Colors.surface)
             .cardShadow()
+            .animation(.easeInOut(duration: 0.2), value: themeManager.currentTheme)
     }
 }

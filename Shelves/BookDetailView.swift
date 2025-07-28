@@ -75,21 +75,41 @@ struct BookDetailView: View {
                 .font(.headline)
                 .fontWeight(.semibold)
             
-            HStack(spacing: 16) {
-                StatusButton(
-                    title: "Currently Reading",
-                    isSelected: book.currentlyReading,
-                    color: .blue
-                ) {
-                    toggleCurrentlyReading()
+            VStack(spacing: 12) {
+                HStack(spacing: 16) {
+                    StatusButton(
+                        title: "Want to Read",
+                        isSelected: book.isWantToRead ?? false,
+                        color: .orange
+                    ) {
+                        toggleWantToRead()
+                    }
+                    
+                    StatusButton(
+                        title: "Currently Reading",
+                        isSelected: book.currentlyReading,
+                        color: .blue
+                    ) {
+                        toggleCurrentlyReading()
+                    }
                 }
                 
-                StatusButton(
-                    title: "Finished",
-                    isSelected: book.isRead,
-                    color: .green
-                ) {
-                    toggleReadStatus()
+                HStack(spacing: 16) {
+                    StatusButton(
+                        title: "Finished",
+                        isSelected: book.isRead,
+                        color: .green
+                    ) {
+                        toggleReadStatus()
+                    }
+                    
+                    StatusButton(
+                        title: "Want to Buy",
+                        isSelected: book.isWantToBuy ?? false,
+                        color: .purple
+                    ) {
+                        toggleWantToBuy()
+                    }
                 }
             }
             
@@ -190,6 +210,7 @@ struct BookDetailView: View {
         book.currentlyReading.toggle()
         if book.currentlyReading {
             book.isRead = false
+            book.isWantToRead = false
         }
         try? viewContext.save()
     }
@@ -198,7 +219,25 @@ struct BookDetailView: View {
         book.isRead.toggle()
         if book.isRead {
             book.currentlyReading = false
+            book.isWantToRead = false
+            book.dateRead = Date()
         }
+        try? viewContext.save()
+    }
+    
+    private func toggleWantToRead() {
+        let currentValue = book.isWantToRead ?? false
+        book.isWantToRead = !currentValue
+        if book.isWantToRead == true {
+            book.currentlyReading = false
+            book.isRead = false
+        }
+        try? viewContext.save()
+    }
+    
+    private func toggleWantToBuy() {
+        let currentValue = book.isWantToBuy ?? false
+        book.isWantToBuy = !currentValue
         try? viewContext.save()
     }
 }

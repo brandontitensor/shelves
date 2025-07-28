@@ -11,12 +11,19 @@ import SwiftUI
 struct ShelvesApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var themeManager = ThemeManager.shared
+    @StateObject private var userManager = UserManager.shared
 
     var body: some Scene {
         WindowGroup {
-            MainTabView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                .environmentObject(themeManager)
+            if userManager.hasCompletedOnboarding {
+                MainTabView()
+                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                    .environmentObject(themeManager)
+                    .environmentObject(userManager)
+            } else {
+                OnboardingView()
+                    .environmentObject(userManager)
+            }
         }
     }
 }

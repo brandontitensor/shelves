@@ -1,9 +1,15 @@
 import SwiftUI
 import CoreData
 
+// Environment object to pass sort state to child views
+class LibraryViewEnvironment: ObservableObject {
+    @Published var currentSortOption: LibraryView.SortOption?
+}
+
 struct LibraryView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var themeManager: ThemeManager
+    @StateObject private var libraryEnvironment = LibraryViewEnvironment()
     @State private var searchText = ""
     @State private var viewMode: ViewMode = .covers
     @State private var sortOption: SortOption = .dateAdded
@@ -31,6 +37,9 @@ struct LibraryView: View {
         case dateAdded = "Date Added"
         case title = "Title"
         case author = "Author"
+        case genre = "Genre"
+        case format = "Format"
+        case rating = "Rating"
         case dateRead = "Date Read"
         
         var sortDescriptors: [NSSortDescriptor] {
@@ -40,7 +49,28 @@ struct LibraryView: View {
             case .title:
                 return [NSSortDescriptor(keyPath: \Book.title, ascending: true)]
             case .author:
-                return [NSSortDescriptor(keyPath: \Book.author, ascending: true)]
+                return [
+                    NSSortDescriptor(keyPath: \Book.author, ascending: true),
+                    NSSortDescriptor(keyPath: \Book.title, ascending: true)
+                ]
+            case .genre:
+                return [
+                    NSSortDescriptor(keyPath: \Book.genre, ascending: true),
+                    NSSortDescriptor(keyPath: \Book.author, ascending: true),
+                    NSSortDescriptor(keyPath: \Book.title, ascending: true)
+                ]
+            case .format:
+                return [
+                    NSSortDescriptor(keyPath: \Book.format, ascending: true),
+                    NSSortDescriptor(keyPath: \Book.author, ascending: true),
+                    NSSortDescriptor(keyPath: \Book.title, ascending: true)
+                ]
+            case .rating:
+                return [
+                    NSSortDescriptor(keyPath: \Book.rating, ascending: false),
+                    NSSortDescriptor(keyPath: \Book.author, ascending: true),
+                    NSSortDescriptor(keyPath: \Book.title, ascending: true)
+                ]
             case .dateRead:
                 return [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)] // Placeholder for actual read date
             }
@@ -55,26 +85,82 @@ struct LibraryView: View {
             result = result.filter { book in
                 (book.title?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 (book.author?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                (book.genre?.localizedCaseInsensitiveContains(searchText) ?? false)
+                (book.genre?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                (book.format?.localizedCaseInsensitiveContains(searchText) ?? false)
             }
         }
         
         // Filter by room
         if selectedRoom != "All Libraries" {
-            result = result.filter { book in
-                book.libraryName == selectedRoom
+            if selectedRoom == "Wishlist" {
+                result = result.filter { book in
+                    (book.isWantToRead ?? false) || (book.isWantToBuy ?? false)
+                }
+            } else {
+                result = result.filter { book in
+                    book.libraryName == selectedRoom
+                }
             }
         }
         
-        // Apply sorting
+        // Apply sorting with multi-level subsorts
         return result.sorted { lhs, rhs in
             switch sortOption {
             case .dateAdded:
                 return (lhs.dateAdded ?? Date.distantPast) > (rhs.dateAdded ?? Date.distantPast)
+                
             case .title:
                 return (lhs.title ?? "") < (rhs.title ?? "")
+                
             case .author:
-                return (lhs.author ?? "") < (rhs.author ?? "")
+                // Primary sort: Author, Secondary sort: Title
+                let lhsAuthor = lhs.author ?? ""
+                let rhsAuthor = rhs.author ?? ""
+                if lhsAuthor != rhsAuthor {
+                    return lhsAuthor < rhsAuthor
+                }
+                return (lhs.title ?? "") < (rhs.title ?? "")
+                
+            case .genre:
+                // Primary sort: Genre, Secondary sort: Author, Tertiary sort: Title
+                let lhsGenre = lhs.genre ?? ""
+                let rhsGenre = rhs.genre ?? ""
+                if lhsGenre != rhsGenre {
+                    return lhsGenre < rhsGenre
+                }
+                let lhsAuthor = lhs.author ?? ""
+                let rhsAuthor = rhs.author ?? ""
+                if lhsAuthor != rhsAuthor {
+                    return lhsAuthor < rhsAuthor
+                }
+                return (lhs.title ?? "") < (rhs.title ?? "")
+                
+            case .format:
+                // Primary sort: Format, Secondary sort: Author, Tertiary sort: Title
+                let lhsFormat = lhs.format ?? "Physical"
+                let rhsFormat = rhs.format ?? "Physical"
+                if lhsFormat != rhsFormat {
+                    return lhsFormat < rhsFormat
+                }
+                let lhsAuthor = lhs.author ?? ""
+                let rhsAuthor = rhs.author ?? ""
+                if lhsAuthor != rhsAuthor {
+                    return lhsAuthor < rhsAuthor
+                }
+                return (lhs.title ?? "") < (rhs.title ?? "")
+                
+            case .rating:
+                // Primary sort: Rating (highest first), Secondary sort: Author, Tertiary sort: Title
+                if lhs.rating != rhs.rating {
+                    return lhs.rating > rhs.rating
+                }
+                let lhsAuthor = lhs.author ?? ""
+                let rhsAuthor = rhs.author ?? ""
+                if lhsAuthor != rhsAuthor {
+                    return lhsAuthor < rhsAuthor
+                }
+                return (lhs.title ?? "") < (rhs.title ?? "")
+                
             case .dateRead:
                 let lhsDate = lhs.isRead ? (lhs.dateAdded ?? Date.distantPast) : Date.distantPast
                 let rhsDate = rhs.isRead ? (rhs.dateAdded ?? Date.distantPast) : Date.distantPast
@@ -85,7 +171,14 @@ struct LibraryView: View {
     
     private var availableRooms: [String] {
         let rooms = books.compactMap { $0.libraryName }.unique()
-        return ["All Libraries"] + rooms.sorted()
+        let hasWishlistItems = books.contains { ($0.isWantToRead ?? false) || ($0.isWantToBuy ?? false) }
+        
+        var availableRooms = ["All Libraries"]
+        if hasWishlistItems {
+            availableRooms.append("Wishlist")
+        }
+        availableRooms.append(contentsOf: rooms.sorted())
+        return availableRooms
     }
     
     var body: some View {
@@ -113,6 +206,13 @@ struct LibraryView: View {
                 }
         }
         .searchable(text: $searchText, prompt: "Search your library...")
+        .environmentObject(libraryEnvironment)
+        .onChange(of: sortOption) { _, newValue in
+            libraryEnvironment.currentSortOption = newValue
+        }
+        .onAppear {
+            libraryEnvironment.currentSortOption = sortOption
+        }
     }
     
     private var searchAndFiltersSection: some View {
@@ -280,6 +380,7 @@ struct RoomFilterChip: View {
 
 struct BookCoverCard: View {
     let book: Book
+    @EnvironmentObject private var libraryView: LibraryViewEnvironment
     
     var body: some View {
         VStack(spacing: ShelvesDesign.Spacing.sm) {
@@ -300,10 +401,94 @@ struct BookCoverCard: View {
                         .foregroundColor(ShelvesDesign.Colors.sepia)
                         .lineLimit(1)
                 }
+                
+                // Show additional info based on sort option
+                additionalInfoView
+                
+                // Show wishlist status
+                wishlistStatusView
             }
             .frame(maxWidth: .infinity)
         }
     }
+    
+    @ViewBuilder
+    private var additionalInfoView: some View {
+        if let currentSort = libraryView.currentSortOption {
+            switch currentSort {
+            case .genre:
+                if let genre = book.genre, !genre.isEmpty {
+                    Text(genre)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(ShelvesDesign.Colors.chestnut)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(ShelvesDesign.Colors.chestnut.opacity(0.1))
+                        )
+                        .lineLimit(1)
+                }
+            case .format:
+                if let format = book.format, !format.isEmpty {
+                    Text(format)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(ShelvesDesign.Colors.navy)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(ShelvesDesign.Colors.navy.opacity(0.1))
+                        )
+                        .lineLimit(1)
+                }
+            case .rating:
+                if book.rating > 0 {
+                    HStack(spacing: 1) {
+                        ForEach(1...5, id: \.self) { index in
+                            Image(systemName: index <= Int(book.rating) ? "star.fill" : "star")
+                                .font(.system(size: 8))
+                                .foregroundColor(ShelvesDesign.Colors.antiqueGold)
+                        }
+                    }
+                }
+            default:
+                EmptyView()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var wishlistStatusView: some View {
+        HStack(spacing: 4) {
+            if book.isWantToRead ?? false {
+                Text("Want to Read")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(.orange.opacity(0.1))
+                    )
+                    .lineLimit(1)
+            }
+            
+            if book.isWantToBuy ?? false {
+                Text("Want to Buy")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.purple)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(.purple.opacity(0.1))
+                    )
+                    .lineLimit(1)
+            }
+        }
+    }
+}
     
     private func bookSpineColor(for book: Book) -> Color {
         let colors = [
@@ -317,21 +502,16 @@ struct BookCoverCard: View {
         let hash = book.title?.hashValue ?? 0
         return colors[abs(hash) % colors.count]
     }
-}
+
 
 struct BookSpineRow: View {
     let book: Book
+    @EnvironmentObject private var libraryView: LibraryViewEnvironment
     
     var body: some View {
         HStack(spacing: ShelvesDesign.Spacing.md) {
-            // Spine representation
-            BookSpinePlaceholder(
-                title: book.title ?? "",
-                author: book.author ?? "",
-                color: bookSpineColor(for: book),
-                isHorizontal: true
-            )
-            .frame(width: 60, height: 40)
+            // Miniaturized book cover
+            BookCoverImage(book: book, style: .list)
             
             // Book details
             VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
@@ -358,6 +538,18 @@ struct BookSpineRow: View {
                         StatusPill(text: library, color: ShelvesDesign.Colors.chestnut)
                     }
                     
+                    // Show wishlist status
+                    if book.isWantToRead ?? false {
+                        StatusPill(text: "Want to Read", color: .orange)
+                    }
+                    
+                    if book.isWantToBuy ?? false {
+                        StatusPill(text: "Want to Buy", color: .purple)
+                    }
+                    
+                    // Show additional info based on sort option
+                    additionalSpineInfo
+                    
                     Spacer()
                 }
             }
@@ -372,6 +564,40 @@ struct BookSpineRow: View {
         .background(
             WarmCardBackground()
         )
+    }
+    
+    @ViewBuilder
+    private var additionalSpineInfo: some View {
+        if let currentSort = libraryView.currentSortOption {
+            switch currentSort {
+            case .genre:
+                if let genre = book.genre, !genre.isEmpty {
+                    StatusPill(text: genre, color: ShelvesDesign.Colors.burgundy)
+                }
+            case .format:
+                if let format = book.format, !format.isEmpty {
+                    StatusPill(text: format, color: ShelvesDesign.Colors.navy)
+                }
+            case .rating:
+                if book.rating > 0 {
+                    HStack(spacing: 1) {
+                        ForEach(1...5, id: \.self) { index in
+                            Image(systemName: index <= Int(book.rating) ? "star.fill" : "star")
+                                .font(.system(size: 10))
+                                .foregroundColor(ShelvesDesign.Colors.antiqueGold)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(ShelvesDesign.Colors.antiqueGold.opacity(0.1))
+                    )
+                }
+            default:
+                EmptyView()
+            }
+        }
     }
     
     private func bookSpineColor(for book: Book) -> Color {

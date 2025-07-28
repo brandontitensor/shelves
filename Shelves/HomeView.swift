@@ -4,6 +4,7 @@ import CoreData
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var themeManager: ThemeManager
+    @StateObject private var userManager = UserManager.shared
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)],
@@ -53,6 +54,10 @@ struct HomeView: View {
             BookshelfBackground()
                 .overlay(
                     VStack(spacing: 0) {
+                        // Personalized header
+                        personalizedHeader
+                            .padding(.top, ShelvesDesign.Spacing.md)
+                        
                         if let featured = featuredBook {
                             fullScreenBookDisplay(book: featured)
                         } else {
@@ -64,32 +69,63 @@ struct HomeView: View {
         }
     }
     
-    private func fullScreenBookDisplay(book: Book) -> some View {
-        TabView(selection: $currentIndex) {
-            ForEach(Array(carouselBooks.enumerated()), id: \.element.id) { index, book in
-                BookCarouselCard(book: book)
-                    .tag(index)
+    private var personalizedHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
+                Text("\(userManager.displayName) Shelf")
+                    .font(ShelvesDesign.Typography.titleMedium)
+                    .foregroundColor(ShelvesDesign.Colors.text)
+                
+                if !currentlyReadingBooks.isEmpty {
+                    Text("Currently reading \(currentlyReadingBooks.count) book\(currentlyReadingBooks.count == 1 ? "" : "s")")
+                        .font(ShelvesDesign.Typography.bodyMedium)
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                } else if allBooks.isEmpty {
+                    Text("Ready to start your library journey")
+                        .font(ShelvesDesign.Typography.bodyMedium)
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                } else {
+                    Text("\(allBooks.count) books in your collection")
+                        .font(ShelvesDesign.Typography.bodyMedium)
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                }
             }
+            
+            Spacer()
         }
-        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-        .overlay(alignment: .bottom) {
-            customPageIndicator
-        }
-        .overlay(alignment: .bottomTrailing) {
-            bookActionsOverlay(book: book)
-        }
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        if value.translation.width > 50 && currentIndex > 0 {
-                            currentIndex -= 1
-                        } else if value.translation.width < -50 && currentIndex < carouselBooks.count - 1 {
-                            currentIndex += 1
+        .padding(.horizontal, ShelvesDesign.Spacing.lg)
+    }
+    
+    private func fullScreenBookDisplay(book: Book) -> some View {
+        VStack(spacing: 0) {
+            // Main content area
+            TabView(selection: $currentIndex) {
+                ForEach(Array(carouselBooks.enumerated()), id: \.element.id) { index, book in
+                    BookCarouselCard(book: book)
+                        .tag(index)
+                }
+            }
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            if value.translation.width > 50 && currentIndex > 0 {
+                                currentIndex -= 1
+                            } else if value.translation.width < -50 && currentIndex < carouselBooks.count - 1 {
+                                currentIndex += 1
+                            }
                         }
                     }
-                }
-        )
+            )
+            
+            // Bottom controls area
+            VStack(spacing: ShelvesDesign.Spacing.lg) {
+                customPageIndicator
+                bookActionsBottomBar(book: book)
+            }
+            .padding(.bottom, ShelvesDesign.Spacing.lg)
+        }
     }
     
     private var customPageIndicator: some View {
@@ -102,13 +138,13 @@ struct HomeView: View {
                     .animation(.easeInOut(duration: 0.2), value: currentIndex)
             }
         }
-        .padding(.bottom, ShelvesDesign.Spacing.xxl)
     }
     
-    private func bookActionsOverlay(book: Book) -> some View {
-        VStack(spacing: ShelvesDesign.Spacing.md) {
+    private func bookActionsBottomBar(book: Book) -> some View {
+        HStack(spacing: ShelvesDesign.Spacing.md) {
             if !book.isRead {
-                BookActionButton(
+                HorizontalActionButton(
+                    title: "Mark Read",
                     icon: "checkmark.circle.fill",
                     color: ShelvesDesign.Colors.forestGreen
                 ) {
@@ -117,15 +153,39 @@ struct HomeView: View {
             }
             
             NavigationLink(destination: BookDetailView(book: book)) {
-                BookActionButton(
-                    icon: "note.text",
-                    color: ShelvesDesign.Colors.burgundy
-                ) {}
+                HStack(spacing: ShelvesDesign.Spacing.sm) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white)
+                    
+                    Text("View Details")
+                        .font(ShelvesDesign.Typography.labelMedium)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, ShelvesDesign.Spacing.lg)
+                .padding(.vertical, ShelvesDesign.Spacing.md)
+                .background(
+                    Capsule()
+                        .fill(ShelvesDesign.Colors.antiqueGold)
+                        .shadow(color: ShelvesDesign.Colors.antiqueGold.opacity(0.3), radius: 4, x: 0, y: 2)
+                )
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(.trailing, ShelvesDesign.Spacing.lg)
-        .padding(.bottom, ShelvesDesign.Spacing.xxl)
+        .padding(.horizontal, ShelvesDesign.Spacing.lg)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    ShelvesDesign.Colors.background.opacity(0.9),
+                    ShelvesDesign.Colors.background
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+        )
     }
     
     private var emptyLibraryView: some View {
@@ -140,22 +200,22 @@ struct HomeView: View {
                 VStack(spacing: ShelvesDesign.Spacing.sm) {
                     Text("Welcome to Shelves")
                         .font(ShelvesDesign.Typography.titleMedium)
-                        .foregroundColor(ShelvesDesign.Colors.sepia)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     Text("Your personal library sanctuary")
                         .font(ShelvesDesign.Typography.bodyLarge)
-                        .foregroundColor(ShelvesDesign.Colors.slateGray)
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
                 }
             }
             
             VStack(spacing: ShelvesDesign.Spacing.md) {
                 Text("Start building your collection")
                     .font(ShelvesDesign.Typography.headlineSmall)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                 
                 Text("Add your first book to see it featured here with personalized recommendations from your collection.")
                     .font(ShelvesDesign.Typography.bodyMedium)
-                    .foregroundColor(ShelvesDesign.Colors.sepia)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
             }
@@ -219,14 +279,14 @@ struct BookCarouselCard: View {
             VStack(spacing: ShelvesDesign.Spacing.xs) {
                 Text(book.title ?? "Unknown Title")
                     .font(ShelvesDesign.Typography.titleSmall)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                 
                 if let author = book.author {
                     Text("by \(author)")
                         .font(ShelvesDesign.Typography.bodyLarge)
-                        .foregroundColor(ShelvesDesign.Colors.sepia)
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                 }
@@ -237,7 +297,7 @@ struct BookCarouselCard: View {
                 let recommendation = RecommendationService.getRecommendationText(for: book)
                 Text(recommendation.subtitle)
                     .font(ShelvesDesign.Typography.bodyMedium)
-                    .foregroundColor(ShelvesDesign.Colors.slateGray)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .padding(.horizontal, ShelvesDesign.Spacing.lg)
@@ -310,6 +370,35 @@ struct BookActionButton: View {
                         .fill(color)
                         .shadow(color: color.opacity(0.3), radius: 4, x: 0, y: 2)
                 )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct LabeledActionButton: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: ShelvesDesign.Spacing.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(.white)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        Circle()
+                            .fill(color)
+                            .shadow(color: color.opacity(0.3), radius: 6, x: 0, y: 3)
+                    )
+                
+                Text(title)
+                    .font(ShelvesDesign.Typography.labelMedium)
+                    .foregroundColor(ShelvesDesign.Colors.text)
+                    .multilineTextAlignment(.center)
+            }
         }
         .buttonStyle(PlainButtonStyle())
     }

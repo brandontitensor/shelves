@@ -50,31 +50,49 @@ struct MainTabView: View {
                 }
                 .tag(4)
         }
-        .accentColor(ShelvesDesign.Colors.antiqueGold)
-        .background(ShelvesDesign.Colors.parchment)
+        .accentColor(ShelvesDesign.Colors.primary)
+        .background(ShelvesDesign.Colors.background)
         .onAppear {
+            updateTabBarAppearance()
+        }
+        .onChange(of: themeManager.currentTheme) { _, _ in
+            updateTabBarAppearance()
+        }
+    }
+    
+    private func updateTabBarAppearance() {
+        DispatchQueue.main.async {
             // Customize tab bar appearance
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor(ShelvesDesign.Colors.ivory)
-            appearance.selectionIndicatorTintColor = UIColor(ShelvesDesign.Colors.antiqueGold)
+            appearance.backgroundColor = UIColor(ShelvesDesign.Colors.surface)
+            appearance.selectionIndicatorTintColor = UIColor(ShelvesDesign.Colors.primary)
             
             // Normal state
-            appearance.stackedLayoutAppearance.normal.iconColor = UIColor(ShelvesDesign.Colors.chestnut)
+            appearance.stackedLayoutAppearance.normal.iconColor = UIColor(ShelvesDesign.Colors.secondary)
             appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
-                .foregroundColor: UIColor(ShelvesDesign.Colors.sepia),
+                .foregroundColor: UIColor(ShelvesDesign.Colors.textSecondary),
                 .font: UIFont.systemFont(ofSize: 10, weight: .medium)
             ]
             
             // Selected state
-            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(ShelvesDesign.Colors.antiqueGold)
+            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(ShelvesDesign.Colors.primary)
             appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
-                .foregroundColor: UIColor(ShelvesDesign.Colors.antiqueGold),
+                .foregroundColor: UIColor(ShelvesDesign.Colors.primary),
                 .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
             ]
             
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
+            
+            // Force immediate update of all existing tab bars
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                window.subviews.forEach { view in
+                    view.removeFromSuperview()
+                    window.addSubview(view)
+                }
+            }
         }
     }
 }

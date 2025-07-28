@@ -39,13 +39,13 @@ enum AppTheme: String, CaseIterable {
             )
         case .midnight:
             return ThemeColors(
-                primary: Color.cyan,
-                secondary: Color.indigo,
-                accent: Color.blue,
-                background: Color(red: 0.1, green: 0.1, blue: 0.2),
-                surface: Color(red: 0.15, green: 0.15, blue: 0.25),
-                text: Color.white,
-                textSecondary: Color.gray
+                primary: Color(red: 0.4, green: 0.7, blue: 1.0), // Soft blue
+                secondary: Color(red: 0.2, green: 0.3, blue: 0.5), // Dark blue-gray
+                accent: Color(red: 0.3, green: 0.5, blue: 0.8), // Medium blue
+                background: Color(red: 0.08, green: 0.12, blue: 0.20), // Deep blue-black
+                surface: Color(red: 0.12, green: 0.16, blue: 0.24), // Slightly lighter blue-black
+                text: Color(red: 0.98, green: 0.98, blue: 1.0), // Near white
+                textSecondary: Color(red: 0.85, green: 0.88, blue: 0.95) // Lighter blue-gray
             )
         case .autumn:
             return ThemeColors(
