@@ -22,6 +22,7 @@ struct ShelvesApp: App {
                     .environmentObject(userManager)
             } else {
                 OnboardingView()
+                    .environmentObject(themeManager)
                     .environmentObject(userManager)
             }
         }

@@ -42,7 +42,7 @@ struct AddBookView: View {
     private let bookFormats = ["Physical", "Ebook", "Audiobook"]
     
     private var predefinedLibraries: [String] {
-        ["Home Library", "Wishlist", "Borrowed Books", "Work Library", "Vacation Reading"]
+        ["Home Library", "Work Library", "Vacation Reading"]
     }
     
     private var availableLibraries: [String] {

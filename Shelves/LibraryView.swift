@@ -6,6 +6,16 @@ class LibraryViewEnvironment: ObservableObject {
     @Published var currentSortOption: LibraryView.SortOption?
 }
 
+// Smart Collection Model
+struct SmartCollection: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    let count: Int
+}
+
 struct LibraryView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var themeManager: ThemeManager
@@ -14,7 +24,8 @@ struct LibraryView: View {
     @State private var viewMode: ViewMode = .covers
     @State private var sortOption: SortOption = .dateAdded
     @State private var showingFilters = false
-    @State private var selectedRoom = "All Libraries"
+    @State private var selectedSmartCollection: String? = nil
+    @State private var selectedCustomLibrary: String? = nil
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)],
@@ -90,16 +101,28 @@ struct LibraryView: View {
             }
         }
         
-        // Filter by room
-        if selectedRoom != "All Libraries" {
-            if selectedRoom == "Wishlist" {
+        // Filter by Smart Collection or Custom Library
+        if let smartCollection = selectedSmartCollection {
+            switch smartCollection {
+            case "my_library":
                 result = result.filter { book in
-                    (book.isWantToRead ?? false) || (book.isWantToBuy ?? false)
+                    !book.isWantToRead && !book.isWantToBuy && book.libraryName != "Borrowed Books"
                 }
-            } else {
+            case "want_to_read":
+                result = result.filter { $0.isWantToRead }
+            case "want_to_buy":
+                result = result.filter { $0.isWantToBuy }
+            case "read_not_owned":
                 result = result.filter { book in
-                    book.libraryName == selectedRoom
+                    book.isRead && !book.isWantToRead && !book.isWantToBuy && 
+                    (book.libraryName == "Borrowed Books" || book.libraryName == nil)
                 }
+            default:
+                break
+            }
+        } else if let customLibrary = selectedCustomLibrary {
+            result = result.filter { book in
+                book.libraryName == customLibrary
             }
         }
         
@@ -169,16 +192,69 @@ struct LibraryView: View {
         }
     }
     
-    private var availableRooms: [String] {
-        let rooms = books.compactMap { $0.libraryName }.unique()
-        let hasWishlistItems = books.contains { ($0.isWantToRead ?? false) || ($0.isWantToBuy ?? false) }
-        
-        var availableRooms = ["All Libraries"]
-        if hasWishlistItems {
-            availableRooms.append("Wishlist")
-        }
-        availableRooms.append(contentsOf: rooms.sorted())
-        return availableRooms
+    // Smart Collections
+    private var smartCollections: [SmartCollection] {
+        [
+            SmartCollection(
+                id: "my_library",
+                title: "My Library",
+                subtitle: "Books I own",
+                icon: "house.fill",
+                color: ShelvesDesign.Colors.forestGreen,
+                count: ownedBooksCount
+            ),
+            SmartCollection(
+                id: "want_to_read",
+                title: "Want to Read",
+                subtitle: "Reading wishlist",
+                icon: "book.fill",
+                color: ShelvesDesign.Colors.antiqueGold,
+                count: wantToReadCount
+            ),
+            SmartCollection(
+                id: "want_to_buy",
+                title: "Want to Buy",
+                subtitle: "Purchase wishlist",
+                icon: "cart.fill",
+                color: ShelvesDesign.Colors.burgundy,
+                count: wantToBuyCount
+            ),
+            SmartCollection(
+                id: "read_not_owned",
+                title: "Read but Don't Own",
+                subtitle: "Books I've read",
+                icon: "checkmark.circle.fill",
+                color: ShelvesDesign.Colors.chestnut,
+                count: readNotOwnedCount
+            )
+        ]
+    }
+    
+    private var customLibraries: [String] {
+        let allLibraries = books.compactMap { $0.libraryName }.unique().sorted()
+        return allLibraries.filter { !["Borrowed Books"].contains($0) } // Filter out old confusing names
+    }
+    
+    // Smart Collection Counts
+    private var ownedBooksCount: Int {
+        books.filter { book in
+            !book.isWantToRead && !book.isWantToBuy && book.libraryName != "Borrowed Books"
+        }.count
+    }
+    
+    private var wantToReadCount: Int {
+        books.filter { $0.isWantToRead }.count
+    }
+    
+    private var wantToBuyCount: Int {
+        books.filter { $0.isWantToBuy }.count
+    }
+    
+    private var readNotOwnedCount: Int {
+        books.filter { book in
+            book.isRead && !book.isWantToRead && !book.isWantToBuy && 
+            (book.libraryName == "Borrowed Books" || book.libraryName == nil)
+        }.count
     }
     
     var body: some View {
@@ -186,14 +262,13 @@ struct LibraryView: View {
             BookshelfBackground()
                 .overlay(
                     VStack(spacing: 0) {
-                        // Search and filters
-                        searchAndFiltersSection
-                        
-                        // Library content
-                        if filteredBooks.isEmpty {
-                            emptyLibraryView
+                        // Show content based on selection
+                        if selectedSmartCollection != nil || selectedCustomLibrary != nil {
+                            // Selected collection/library view
+                            selectedCollectionView
                         } else {
-                            libraryContentView
+                            // Main library overview
+                            mainLibraryView
                         }
                     }
                 )
@@ -215,26 +290,136 @@ struct LibraryView: View {
         }
     }
     
-    private var searchAndFiltersSection: some View {
-        VStack(spacing: ShelvesDesign.Spacing.md) {
-            // Room filter
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: ShelvesDesign.Spacing.sm) {
-                    ForEach(availableRooms, id: \.self) { room in
-                        RoomFilterChip(
-                            room: room,
-                            isSelected: selectedRoom == room
-                        ) {
-                            selectedRoom = room
+    // MARK: - Main Library View
+    private var mainLibraryView: some View {
+        ScrollView {
+            VStack(spacing: ShelvesDesign.Spacing.lg) {
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                    
+                    TextField("Search books...", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                }
+                .padding(ShelvesDesign.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: ShelvesDesign.CornerRadius.medium)
+                        .fill(ShelvesDesign.Colors.surface)
+                        .cardShadow()
+                )
+                .padding(.horizontal, ShelvesDesign.Spacing.md)
+                
+                // Smart Collections Section
+                VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
+                    HStack {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(ShelvesDesign.Colors.antiqueGold)
+                            .font(.title3)
+                        
+                        Text("Smart Collections")
+                            .font(ShelvesDesign.Typography.headlineMedium)
+                            .foregroundColor(ShelvesDesign.Colors.text)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, ShelvesDesign.Spacing.md)
+                    
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: ShelvesDesign.Spacing.md) {
+                        ForEach(smartCollections) { collection in
+                            SmartCollectionCard(collection: collection) {
+                                selectedSmartCollection = collection.id
+                            }
                         }
                     }
+                    .padding(.horizontal, ShelvesDesign.Spacing.md)
                 }
-                .padding(.horizontal, ShelvesDesign.Spacing.md)
+                
+                // Custom Libraries Section
+                if !customLibraries.isEmpty {
+                    VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
+                        HStack {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(ShelvesDesign.Colors.chestnut)
+                                .font(.title3)
+                            
+                            Text("My Libraries")
+                                .font(ShelvesDesign.Typography.headlineMedium)
+                                .foregroundColor(ShelvesDesign.Colors.text)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, ShelvesDesign.Spacing.md)
+                        
+                        LazyVStack(spacing: ShelvesDesign.Spacing.sm) {
+                            ForEach(customLibraries, id: \.self) { library in
+                                CustomLibraryRow(
+                                    name: library,
+                                    count: books.filter { $0.libraryName == library }.count
+                                ) {
+                                    selectedCustomLibrary = library
+                                }
+                            }
+                        }
+                        .padding(.horizontal, ShelvesDesign.Spacing.md)
+                    }
+                }
+                
+                Spacer(minLength: 100)
             }
-            
-            // Sort and view options
+            .padding(.top, ShelvesDesign.Spacing.md)
+        }
+    }
+    
+    // MARK: - Selected Collection View
+    private var selectedCollectionView: some View {
+        VStack(spacing: 0) {
+            // Back button and title
             HStack {
-                // Sort picker
+                Button(action: {
+                    selectedSmartCollection = nil
+                    selectedCustomLibrary = nil
+                }) {
+                    HStack(spacing: ShelvesDesign.Spacing.xs) {
+                        Image(systemName: "chevron.left")
+                        Text("Library")
+                    }
+                    .font(ShelvesDesign.Typography.bodyMedium)
+                    .foregroundColor(ShelvesDesign.Colors.primary)
+                }
+                
+                Spacer()
+                
+                // Collection title
+                if let smartCollectionId = selectedSmartCollection,
+                   let collection = smartCollections.first(where: { $0.id == smartCollectionId }) {
+                    Text(collection.title)
+                        .font(ShelvesDesign.Typography.headlineMedium)
+                        .foregroundColor(ShelvesDesign.Colors.text)
+                } else if let customLibrary = selectedCustomLibrary {
+                    Text(customLibrary)
+                        .font(ShelvesDesign.Typography.headlineMedium)
+                        .foregroundColor(ShelvesDesign.Colors.text)
+                }
+                
+                Spacer()
+                
+                // View mode toggle
+                Button(action: {
+                    viewMode = viewMode == .covers ? .spines : .covers
+                }) {
+                    Image(systemName: viewMode.icon)
+                        .font(ShelvesDesign.Typography.bodyMedium)
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                }
+            }
+            .padding(ShelvesDesign.Spacing.md)
+            
+            // Sort options
+            HStack {
                 Menu {
                     ForEach(SortOption.allCases, id: \.self) { option in
                         Button(option.rawValue) {
@@ -248,27 +433,50 @@ struct LibraryView: View {
                         Image(systemName: "chevron.down")
                     }
                     .font(ShelvesDesign.Typography.labelMedium)
-                    .foregroundColor(ShelvesDesign.Colors.sepia)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
                     .padding(.horizontal, ShelvesDesign.Spacing.md)
                     .padding(.vertical, ShelvesDesign.Spacing.sm)
                     .background(
                         RoundedRectangle(cornerRadius: ShelvesDesign.CornerRadius.small)
-                            .fill(ShelvesDesign.Colors.ivory)
+                            .fill(ShelvesDesign.Colors.surface)
                             .cardShadow()
                     )
                 }
                 
                 Spacer()
-                
-                // Book count
-                Text("\(filteredBooks.count) books")
-                    .font(ShelvesDesign.Typography.bodyMedium)
-                    .foregroundColor(ShelvesDesign.Colors.slateGray)
             }
             .padding(.horizontal, ShelvesDesign.Spacing.md)
+            .padding(.bottom, ShelvesDesign.Spacing.sm)
+            
+            // Books grid/list
+            if filteredBooks.isEmpty {
+                emptyCollectionView
+            } else {
+                libraryContentView
+            }
         }
-        .padding(.top, ShelvesDesign.Spacing.sm)
     }
+    
+    private var emptyCollectionView: some View {
+        VStack(spacing: ShelvesDesign.Spacing.lg) {
+            Spacer()
+            
+            Image(systemName: "books.vertical")
+                .font(.system(size: 64))
+                .foregroundColor(ShelvesDesign.Colors.textSecondary.opacity(0.6))
+            
+            Text("No books in this collection")
+                .font(ShelvesDesign.Typography.headlineMedium)
+                .foregroundColor(ShelvesDesign.Colors.text)
+            
+            Text("Start adding books to see them here")
+                .font(ShelvesDesign.Typography.bodyMedium)
+                .foregroundColor(ShelvesDesign.Colors.textSecondary)
+            
+            Spacer()
+        }
+    }
+    
     
     private var viewModeToggle: some View {
         Button {
@@ -679,6 +887,97 @@ extension Array where Element: Hashable {
     func unique() -> [Element] {
         var seen = Set<Element>()
         return filter { seen.insert($0).inserted }
+    }
+}
+
+// MARK: - Smart Collection Card
+struct SmartCollectionCard: View {
+    let collection: SmartCollection
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: ShelvesDesign.Spacing.sm) {
+                // Icon and count
+                HStack {
+                    Image(systemName: collection.icon)
+                        .font(.title2)
+                        .foregroundColor(collection.color)
+                    
+                    Spacer()
+                    
+                    Text("\(collection.count)")
+                        .font(ShelvesDesign.Typography.headlineMedium)
+                        .foregroundColor(ShelvesDesign.Colors.text)
+                        .fontWeight(.semibold)
+                }
+                
+                // Title and subtitle
+                VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
+                    HStack {
+                        Text(collection.title)
+                            .font(ShelvesDesign.Typography.labelLarge)
+                            .foregroundColor(ShelvesDesign.Colors.text)
+                            .fontWeight(.medium)
+                        
+                        Spacer()
+                    }
+                    
+                    HStack {
+                        Text(collection.subtitle)
+                            .font(ShelvesDesign.Typography.bodySmall)
+                            .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                        
+                        Spacer()
+                    }
+                }
+            }
+            .padding(ShelvesDesign.Spacing.md)
+            .background(
+                WarmCardBackground()
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Custom Library Row
+struct CustomLibraryRow: View {
+    let name: String
+    let count: Int
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: ShelvesDesign.Spacing.md) {
+                // Folder icon
+                Image(systemName: "folder.fill")
+                    .font(.title3)
+                    .foregroundColor(ShelvesDesign.Colors.chestnut)
+                
+                // Library name
+                Text(name)
+                    .font(ShelvesDesign.Typography.bodyLarge)
+                    .foregroundColor(ShelvesDesign.Colors.text)
+                
+                Spacer()
+                
+                // Book count
+                Text("\(count) books")
+                    .font(ShelvesDesign.Typography.bodyMedium)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+            }
+            .padding(ShelvesDesign.Spacing.md)
+            .background(
+                WarmCardBackground()
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
