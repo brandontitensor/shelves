@@ -294,21 +294,6 @@ struct LibraryView: View {
     private var mainLibraryView: some View {
         ScrollView {
             VStack(spacing: ShelvesDesign.Spacing.lg) {
-                // Search bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
-                    
-                    TextField("Search books...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                }
-                .padding(ShelvesDesign.Spacing.md)
-                .background(
-                    RoundedRectangle(cornerRadius: ShelvesDesign.CornerRadius.medium)
-                        .fill(ShelvesDesign.Colors.surface)
-                        .cardShadow()
-                )
-                .padding(.horizontal, ShelvesDesign.Spacing.md)
                 
                 // Smart Collections Section
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
@@ -599,7 +584,7 @@ struct BookCoverCard: View {
             VStack(spacing: ShelvesDesign.Spacing.xs) {
                 Text(book.title ?? "Unknown Title")
                     .font(ShelvesDesign.Typography.labelMedium)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                 
@@ -669,7 +654,7 @@ struct BookCoverCard: View {
     @ViewBuilder
     private var wishlistStatusView: some View {
         HStack(spacing: 4) {
-            if book.isWantToRead ?? false {
+            if book.isWantToRead {
                 Text("Want to Read")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.orange)
@@ -682,7 +667,7 @@ struct BookCoverCard: View {
                     .lineLimit(1)
             }
             
-            if book.isWantToBuy ?? false {
+            if book.isWantToBuy {
                 Text("Want to Buy")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.purple)
@@ -725,7 +710,7 @@ struct BookSpineRow: View {
             VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                 Text(book.title ?? "Unknown Title")
                     .font(ShelvesDesign.Typography.headlineSmall)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                     .lineLimit(1)
                 
                 if let author = book.author {
@@ -747,11 +732,11 @@ struct BookSpineRow: View {
                     }
                     
                     // Show wishlist status
-                    if book.isWantToRead ?? false {
+                    if book.isWantToRead {
                         StatusPill(text: "Want to Read", color: .orange)
                     }
                     
-                    if book.isWantToBuy ?? false {
+                    if book.isWantToBuy {
                         StatusPill(text: "Want to Buy", color: .purple)
                     }
                     

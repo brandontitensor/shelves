@@ -4,6 +4,7 @@ import CoreData
 struct AddBookView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var themeManager: ThemeManager
     let isbn: String?
     
     @State private var title = ""
@@ -17,6 +18,8 @@ struct AddBookView: View {
     @State private var isRead = false
     @State private var isWantToRead = false
     @State private var isWantToBuy = false
+    @State private var currentlyReading = false
+    @State private var isOwned = true
     @State private var rating: Float = 0
     @State private var bookSize = "Unknown"
     @State private var isLoading = false
@@ -80,7 +83,7 @@ struct AddBookView: View {
                         saveBook()
                     }
                     .disabled(title.isEmpty)
-                    .foregroundColor(title.isEmpty ? .gray : .blue)
+                    .foregroundColor(title.isEmpty ? ShelvesDesign.Colors.textSecondary : ShelvesDesign.Colors.primary)
                 }
             }
             .onAppear {
@@ -174,7 +177,7 @@ struct AddBookView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Book Cover")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
                 
                 HStack {
                     Button("Add Cover") {
@@ -201,7 +204,7 @@ struct AddBookView: View {
                                 .fill(Color.gray.opacity(0.3))
                                 .overlay(
                                     Image(systemName: "book.closed")
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
                                 )
                         }
                         .frame(width: 50, height: 70)
@@ -211,7 +214,7 @@ struct AddBookView: View {
                             .fill(Color.gray.opacity(0.3))
                             .overlay(
                                 Image(systemName: "book.closed")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
                             )
                             .frame(width: 50, height: 70)
                             .cornerRadius(8)
@@ -223,7 +226,7 @@ struct AddBookView: View {
             if title.isEmpty {
                 Text("Title is required to save")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
             }
             TextField("Author", text: $author)
             TextField("Published Date", text: $publishedDate)
@@ -250,7 +253,7 @@ struct AddBookView: View {
                     showingImagePicker = true
                 }
                 .font(.caption)
-                .foregroundColor(.blue)
+                .foregroundColor(ShelvesDesign.Colors.primary)
                 #endif
             }
             
@@ -279,6 +282,15 @@ struct AddBookView: View {
                 .onChange(of: isWantToRead) { _, newValue in
                     if newValue {
                         isRead = false
+                        currentlyReading = false
+                    }
+                }
+            
+            Toggle("Currently Reading", isOn: $currentlyReading)
+                .onChange(of: currentlyReading) { _, newValue in
+                    if newValue {
+                        isRead = false
+                        isWantToRead = false
                     }
                 }
             
@@ -286,6 +298,16 @@ struct AddBookView: View {
                 .onChange(of: isRead) { _, newValue in
                     if newValue {
                         isWantToRead = false
+                        currentlyReading = false
+                    }
+                }
+            
+            Toggle("Owned", isOn: $isOwned)
+                .onChange(of: isOwned) { _, newValue in
+                    if newValue {
+                        isWantToBuy = false
+                    } else if isRead {
+                        isWantToBuy = true
                     }
                 }
             
@@ -323,6 +345,7 @@ struct AddBookView: View {
                         author = bookData.author
                         publishedDate = bookData.publishedDate ?? ""
                         pageCount = bookData.pageCount.map(String.init) ?? ""
+                        genre = bookData.genre ?? ""
                         summary = bookData.summary ?? ""
                         coverImageURL = bookData.coverImageURL
                         isLoading = false
@@ -410,6 +433,8 @@ struct AddBookView: View {
         newBook.isRead = isRead
         newBook.isWantToRead = isWantToRead
         newBook.isWantToBuy = isWantToBuy
+        newBook.currentlyReading = currentlyReading
+        newBook.isOwned = isOwned
         newBook.rating = isRead ? rating : 0
         newBook.size = bookSize
         newBook.format = format

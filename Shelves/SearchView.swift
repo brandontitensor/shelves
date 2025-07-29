@@ -121,7 +121,7 @@ struct SearchView: View {
                 
                 TextField("Search your library...", text: $searchText)
                     .font(ShelvesDesign.Typography.bodyLarge)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                     .onSubmit {
                         if !searchText.isEmpty {
                             addToRecentSearches(searchText)
@@ -203,7 +203,7 @@ struct SearchView: View {
             HStack {
                 Text("Recent Searches")
                     .font(ShelvesDesign.Typography.headlineSmall)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                 
                 Spacer()
                 
@@ -228,7 +228,7 @@ struct SearchView: View {
         VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
             Text("Browse by Category")
                 .font(ShelvesDesign.Typography.headlineSmall)
-                .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                .foregroundColor(ShelvesDesign.Colors.text)
             
             LazyVGrid(
                 columns: [
@@ -344,7 +344,7 @@ struct SearchView: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.sm) {
                     Text("Did you mean:")
                         .font(ShelvesDesign.Typography.labelMedium)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     ForEach(suggestedSearches.prefix(3), id: \.self) { suggestion in
                         Button(suggestion) {
@@ -433,7 +433,7 @@ struct RecentSearchRow: View {
                 
                 Text(searchText)
                     .font(ShelvesDesign.Typography.bodyMedium)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                 
                 Spacer()
                 
@@ -469,13 +469,13 @@ struct QuickAccessCard: View {
                     
                     Text("\(count)")
                         .font(ShelvesDesign.Typography.titleSmall)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                 }
                 
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text(title)
                         .font(ShelvesDesign.Typography.headlineSmall)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Text(count == 1 ? "1 book" : "\(count) books")

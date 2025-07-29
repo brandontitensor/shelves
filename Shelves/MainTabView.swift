@@ -63,36 +63,81 @@ struct MainTabView: View {
     private func updateTabBarAppearance() {
         DispatchQueue.main.async {
             // Customize tab bar appearance
-            let appearance = UITabBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor(ShelvesDesign.Colors.surface)
-            appearance.selectionIndicatorTintColor = UIColor(ShelvesDesign.Colors.primary)
+            let tabBarAppearance = UITabBarAppearance()
+            tabBarAppearance.configureWithOpaqueBackground()
+            tabBarAppearance.backgroundColor = UIColor(ShelvesDesign.Colors.surface)
+            tabBarAppearance.selectionIndicatorTintColor = UIColor(ShelvesDesign.Colors.primary)
             
             // Normal state
-            appearance.stackedLayoutAppearance.normal.iconColor = UIColor(ShelvesDesign.Colors.secondary)
-            appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            tabBarAppearance.stackedLayoutAppearance.normal.iconColor = UIColor(ShelvesDesign.Colors.secondary)
+            tabBarAppearance.stackedLayoutAppearance.normal.titleTextAttributes = [
                 .foregroundColor: UIColor(ShelvesDesign.Colors.textSecondary),
                 .font: UIFont.systemFont(ofSize: 10, weight: .medium)
             ]
             
             // Selected state
-            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(ShelvesDesign.Colors.primary)
-            appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            tabBarAppearance.stackedLayoutAppearance.selected.iconColor = UIColor(ShelvesDesign.Colors.primary)
+            tabBarAppearance.stackedLayoutAppearance.selected.titleTextAttributes = [
                 .foregroundColor: UIColor(ShelvesDesign.Colors.primary),
                 .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
             ]
             
-            UITabBar.appearance().standardAppearance = appearance
-            UITabBar.appearance().scrollEdgeAppearance = appearance
+            UITabBar.appearance().standardAppearance = tabBarAppearance
+            UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
             
-            // Force immediate update of all existing tab bars
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first {
-                window.subviews.forEach { view in
-                    view.removeFromSuperview()
-                    window.addSubview(view)
+            // Customize navigation bar appearance
+            let navBarAppearance = UINavigationBarAppearance()
+            navBarAppearance.configureWithOpaqueBackground()
+            navBarAppearance.backgroundColor = UIColor(ShelvesDesign.Colors.background)
+            navBarAppearance.titleTextAttributes = [
+                .foregroundColor: UIColor(ShelvesDesign.Colors.text),
+                .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
+            ]
+            navBarAppearance.largeTitleTextAttributes = [
+                .foregroundColor: UIColor(ShelvesDesign.Colors.text),
+                .font: UIFont.systemFont(ofSize: 34, weight: .bold)
+            ]
+            
+            UINavigationBar.appearance().standardAppearance = navBarAppearance
+            UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
+            UINavigationBar.appearance().compactAppearance = navBarAppearance
+            
+            // Force immediate update of all existing UI elements
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                for window in windowScene.windows {
+                    for view in window.subviews {
+                        view.setNeedsDisplay()
+                    }
+                    // Force navigation bars to update
+                    window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
+                    if let navController = window.rootViewController as? UINavigationController {
+                        navController.navigationBar.setNeedsLayout()
+                        navController.navigationBar.layoutIfNeeded()
+                    }
+                    // Recursively update all navigation controllers
+                    updateNavigationBarsRecursively(viewController: window.rootViewController)
                 }
             }
+        }
+    }
+    
+    private func updateNavigationBarsRecursively(viewController: UIViewController?) {
+        guard let viewController = viewController else { return }
+        
+        if let navigationController = viewController as? UINavigationController {
+            navigationController.navigationBar.setNeedsLayout()
+            navigationController.navigationBar.layoutIfNeeded()
+            for childVC in navigationController.viewControllers {
+                updateNavigationBarsRecursively(viewController: childVC)
+            }
+        } else if let tabBarController = viewController as? UITabBarController {
+            for childVC in tabBarController.viewControllers ?? [] {
+                updateNavigationBarsRecursively(viewController: childVC)
+            }
+        }
+        
+        for childVC in viewController.children {
+            updateNavigationBarsRecursively(viewController: childVC)
         }
     }
 }
@@ -196,7 +241,7 @@ struct AddBookButton: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text(title)
                         .font(ShelvesDesign.Typography.headlineMedium)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     Text(subtitle)
                         .font(ShelvesDesign.Typography.bodyMedium)

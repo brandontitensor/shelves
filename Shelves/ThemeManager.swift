@@ -85,9 +85,19 @@ class ThemeManager: ObservableObject {
         didSet {
             UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled")
             if notificationsEnabled {
-                scheduleReadingReminders()
+                Task {
+                    let granted = await NotificationManager.shared.requestPermission()
+                    if granted {
+                        NotificationManager.shared.scheduleReadingReminders()
+                    } else {
+                        // Permission denied, revert the toggle
+                        await MainActor.run {
+                            self.notificationsEnabled = false
+                        }
+                    }
+                }
             } else {
-                cancelReadingReminders()
+                NotificationManager.shared.cancelReadingReminders()
             }
         }
     }
@@ -105,13 +115,4 @@ class ThemeManager: ObservableObject {
         self.autoBackupEnabled = UserDefaults.standard.bool(forKey: "autoBackupEnabled")
     }
     
-    private func scheduleReadingReminders() {
-        // Basic notification scheduling - can be expanded
-        print("Reading reminders enabled")
-    }
-    
-    private func cancelReadingReminders() {
-        // Cancel scheduled notifications
-        print("Reading reminders disabled")
-    }
 }

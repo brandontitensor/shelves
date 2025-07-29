@@ -3,7 +3,7 @@ import CoreData
 
 struct SettingsView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @StateObject private var themeManager = ThemeManager.shared
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var exportFormat: ExportFormat = .csv
     @State private var showingLibraryManagement = false
     @State private var showingDuplicateDetection = false
@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var isExporting = false
     @State private var showingTestDataAlert = false
     @State private var showingClearDataAlert = false
+    @State private var showingBulkImport = false
+    @State private var showingReadingReminderSettings = false
     
     // Development settings - can be disabled for production
     private let isDevelopmentMode = true
@@ -59,7 +61,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
                     Text("Theme")
                         .font(ShelvesDesign.Typography.headlineSmall)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     VStack(spacing: ShelvesDesign.Spacing.sm) {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
@@ -77,11 +79,13 @@ struct SettingsView: View {
                     .background(ShelvesDesign.Colors.paleBeige)
                 
                 // Notifications
-                SettingsToggle(
+                SettingsButton(
                     title: "Reading Reminders",
-                    subtitle: "Get gentle nudges to read",
-                    isOn: $themeManager.notificationsEnabled
-                )
+                    subtitle: "Configure reading notifications",
+                    icon: "bell.fill"
+                ) {
+                    showingReadingReminderSettings = true
+                }
             }
         }
     }
@@ -107,8 +111,7 @@ struct SettingsView: View {
                     subtitle: "Bulk import from file or service",
                     icon: "square.and.arrow.down"
                 ) {
-                    // TODO: Implement import functionality
-                    print("Import books tapped")
+                    showingBulkImport = true
                 }
                 
                 SettingsButton(
@@ -142,7 +145,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
                     Text("Export Format")
                         .font(ShelvesDesign.Typography.headlineSmall)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     ForEach(ExportFormat.allCases, id: \.self) { format in
                         ExportFormatOption(
@@ -225,6 +228,15 @@ struct SettingsView: View {
             DuplicateDetectionView()
                 .environment(\.managedObjectContext, viewContext)
         }
+        .sheet(isPresented: $showingBulkImport) {
+            BulkImportView()
+                .environment(\.managedObjectContext, viewContext)
+                .environmentObject(themeManager)
+        }
+        .sheet(isPresented: $showingReadingReminderSettings) {
+            ReadingReminderSettingsView()
+                .environmentObject(themeManager)
+        }
         .confirmationDialog("Export Library", isPresented: $showingExportSheet) {
             Button("Export as CSV") { exportLibrary(format: .csv) }
             Button("Export as JSON") { exportLibrary(format: .json) }
@@ -251,7 +263,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                         Text("Current Library Size")
                             .font(ShelvesDesign.Typography.labelLarge)
-                            .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                            .foregroundColor(ShelvesDesign.Colors.text)
                         
                         Text("\(books.count) books in library")
                             .font(ShelvesDesign.Typography.bodySmall)
@@ -285,7 +297,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text("Quick Stats")
                         .font(ShelvesDesign.Typography.headlineSmall)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     let readBooks = books.filter { $0.isRead }.count
                     let currentlyReading = books.filter { $0.currentlyReading }.count
@@ -424,7 +436,7 @@ struct SettingsCard<Content: View>: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text(title)
                         .font(ShelvesDesign.Typography.headlineMedium)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     Text(subtitle)
                         .font(ShelvesDesign.Typography.bodyMedium)
@@ -461,7 +473,7 @@ struct SettingsButton: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text(title)
                         .font(ShelvesDesign.Typography.labelLarge)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     Text(subtitle)
                         .font(ShelvesDesign.Typography.bodySmall)
@@ -490,7 +502,7 @@ struct SettingsToggle: View {
             VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                 Text(title)
                     .font(ShelvesDesign.Typography.labelLarge)
-                    .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                    .foregroundColor(ShelvesDesign.Colors.text)
                 
                 Text(subtitle)
                     .font(ShelvesDesign.Typography.bodySmall)
@@ -526,7 +538,7 @@ struct ThemeOption: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text(theme.rawValue)
                         .font(ShelvesDesign.Typography.labelLarge)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     Text(theme.description)
                         .font(ShelvesDesign.Typography.bodySmall)
@@ -562,7 +574,7 @@ struct ExportFormatOption: View {
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text(format.rawValue)
                         .font(ShelvesDesign.Typography.labelLarge)
-                        .foregroundColor(ShelvesDesign.Colors.warmBlack)
+                        .foregroundColor(ShelvesDesign.Colors.text)
                     
                     Text(format.description)
                         .font(ShelvesDesign.Typography.bodySmall)

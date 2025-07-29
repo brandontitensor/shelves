@@ -5,6 +5,7 @@ struct EditBookView: View {
     let book: Book
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var themeManager: ThemeManager
     
     @State private var title = ""
     @State private var author = ""
@@ -20,6 +21,7 @@ struct EditBookView: View {
     @State private var isWantToRead = false
     @State private var isWantToBuy = false
     @State private var currentlyReading = false
+    @State private var isOwned = true
     @State private var format = "Physical"
     @State private var showingSaveConfirmation = false
     @State private var showingCoverOptions = false
@@ -231,6 +233,15 @@ struct EditBookView: View {
             
             Toggle("Want to Buy", isOn: $isWantToBuy)
             
+            Toggle("Owned", isOn: $isOwned)
+                .onChange(of: isOwned) { _, newValue in
+                    if newValue {
+                        isWantToBuy = false
+                    } else if isRead {
+                        isWantToBuy = true
+                    }
+                }
+            
             if isRead {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Rating: \(String(format: "%.1f", rating))")
@@ -307,9 +318,10 @@ struct EditBookView: View {
         format = book.format ?? "Physical"
         rating = book.rating
         isRead = book.isRead
-        isWantToRead = book.isWantToRead ?? false
-        isWantToBuy = book.isWantToBuy ?? false
+        isWantToRead = book.isWantToRead
+        isWantToBuy = book.isWantToBuy
         currentlyReading = book.currentlyReading
+        isOwned = book.isOwned
     }
     
     private func saveChanges() {
@@ -328,6 +340,7 @@ struct EditBookView: View {
         book.isWantToRead = isWantToRead
         book.isWantToBuy = isWantToBuy
         book.currentlyReading = currentlyReading
+        book.isOwned = isOwned
         
         // Update dateRead when marking as read
         if isRead && book.dateRead == nil {

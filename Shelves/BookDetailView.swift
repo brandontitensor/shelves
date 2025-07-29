@@ -4,6 +4,7 @@ import CoreData
 struct BookDetailView: View {
     let book: Book
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var showingEditView = false
     
     var body: some View {
@@ -75,42 +76,22 @@ struct BookDetailView: View {
                 .font(.headline)
                 .fontWeight(.semibold)
             
-            VStack(spacing: 12) {
-                HStack(spacing: 16) {
-                    StatusButton(
-                        title: "Want to Read",
-                        isSelected: book.isWantToRead ?? false,
-                        color: .orange
-                    ) {
-                        toggleWantToRead()
-                    }
-                    
-                    StatusButton(
-                        title: "Currently Reading",
-                        isSelected: book.currentlyReading,
-                        color: .blue
-                    ) {
-                        toggleCurrentlyReading()
+            // Status tags - only show selected ones
+            let statusTags = getStatusTags()
+            if !statusTags.isEmpty {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], alignment: .leading, spacing: 8) {
+                    ForEach(statusTags, id: \.title) { tag in
+                        StatusTag(title: tag.title, color: tag.color)
                     }
                 }
-                
-                HStack(spacing: 16) {
-                    StatusButton(
-                        title: "Finished",
-                        isSelected: book.isRead,
-                        color: .green
-                    ) {
-                        toggleReadStatus()
-                    }
-                    
-                    StatusButton(
-                        title: "Want to Buy",
-                        isSelected: book.isWantToBuy ?? false,
-                        color: .purple
-                    ) {
-                        toggleWantToBuy()
-                    }
-                }
+            } else {
+                Text("No status selected")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .italic()
             }
             
             if book.isRead && book.rating > 0 {
@@ -206,65 +187,50 @@ struct BookDetailView: View {
         .cornerRadius(12)
     }
     
-    private func toggleCurrentlyReading() {
-        book.currentlyReading.toggle()
+    private func getStatusTags() -> [(title: String, color: Color)] {
+        var tags: [(title: String, color: Color)] = []
+        
+        if book.isWantToRead {
+            tags.append((title: "Want to Read", color: .orange))
+        }
+        
         if book.currentlyReading {
-            book.isRead = false
-            book.isWantToRead = false
+            tags.append((title: "Currently Reading", color: .blue))
         }
-        try? viewContext.save()
-    }
-    
-    private func toggleReadStatus() {
-        book.isRead.toggle()
+        
         if book.isRead {
-            book.currentlyReading = false
-            book.isWantToRead = false
-            book.dateRead = Date()
+            tags.append((title: "Finished", color: .green))
         }
-        try? viewContext.save()
+        
+        if book.isOwned {
+            tags.append((title: "Owned", color: .indigo))
+        }
+        
+        if book.isWantToBuy {
+            tags.append((title: "Want to Buy", color: .purple))
+        }
+        
+        return tags
     }
     
-    private func toggleWantToRead() {
-        let currentValue = book.isWantToRead ?? false
-        book.isWantToRead = !currentValue
-        if book.isWantToRead == true {
-            book.currentlyReading = false
-            book.isRead = false
-        }
-        try? viewContext.save()
-    }
+}
+
+struct StatusTag: View {
+    let title: String
+    let color: Color
     
-    private func toggleWantToBuy() {
-        let currentValue = book.isWantToBuy ?? false
-        book.isWantToBuy = !currentValue
-        try? viewContext.save()
+    var body: some View {
+        Text(title)
+            .font(.subheadline)
+            .fontWeight(.medium)
+            .foregroundColor(color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(color.opacity(0.1))
+            .cornerRadius(20)
     }
 }
 
-struct StatusButton: View {
-    let title: String
-    let isSelected: Bool
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-            }
-            .foregroundColor(isSelected ? color : .secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(isSelected ? color.opacity(0.1) : Color(.systemGray5))
-            .cornerRadius(20)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
 
 struct InfoRow: View {
     let label: String
