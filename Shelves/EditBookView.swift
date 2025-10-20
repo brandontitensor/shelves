@@ -36,22 +36,21 @@ struct EditBookView: View {
     
     let bookSizes = ["Pocket", "Mass Market", "Trade Paperback", "Hardcover", "Large Print", "Unknown"]
     let bookFormats = ["Physical", "Ebook", "Audiobook"]
-    
+
     private var predefinedLibraries: [String] {
         ["Home Library", "Work Library", "Vacation Reading"]
     }
-    
+
+    @FetchRequest(
+        sortDescriptors: [],
+        animation: .default)
+    private var allBooksForLibraries: FetchedResults<Book>
+
     private var availableLibraries: [String] {
-        // Get existing libraries from Core Data
-        let request: NSFetchRequest<Book> = Book.fetchRequest()
-        do {
-            let books = try viewContext.fetch(request)
-            let existingLibraries = Set(books.compactMap { $0.libraryName })
-            let allLibraries = Set(predefinedLibraries).union(existingLibraries)
-            return Array(allLibraries).sorted() + ["Add New Library..."]
-        } catch {
-            return predefinedLibraries + ["Add New Library..."]
-        }
+        // Use existing FetchRequest instead of manual fetch
+        let existingLibraries = Set(allBooksForLibraries.compactMap { $0.libraryName })
+        let allLibraries = Set(predefinedLibraries).union(existingLibraries)
+        return Array(allLibraries).sorted() + ["Add New Library..."]
     }
     
     var body: some View {
@@ -325,7 +324,6 @@ struct EditBookView: View {
     }
     
     private func saveChanges() {
-        print("📚 Starting edit save process...")
         book.title = title.isEmpty ? "Unknown Title" : title
         book.author = author.isEmpty ? nil : author
         book.publishedDate = publishedDate.isEmpty ? nil : publishedDate
@@ -351,7 +349,14 @@ struct EditBookView: View {
         
         // Handle custom cover image
         if let selectedImage = selectedCoverImage {
-            // Save image to documents directory and update URL
+            // Delete old image if it exists and is a local file
+            if let oldURLString = book.coverImageURL,
+               let oldURL = URL(string: oldURLString),
+               oldURL.isFileURL {
+                try? FileManager.default.removeItem(at: oldURL)
+            }
+
+            // Save new image to documents directory and update URL
             if let imageURL = saveImageToDocuments(selectedImage) {
                 book.coverImageURL = imageURL.absoluteString
             }
@@ -361,29 +366,30 @@ struct EditBookView: View {
         
         do {
             try viewContext.save()
-            print("✅ Book updated successfully in Core Data")
-            
+
             // Ensure the alert shows and then dismisses the view
             DispatchQueue.main.async {
                 self.showingSaveConfirmation = true
             }
         } catch {
-            print("❌ Failed to save changes: \(error.localizedDescription)")
+            // Failed to save changes - could add user-facing error alert here
         }
     }
     
     private func saveImageToDocuments(_ image: UIImage) -> URL? {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return nil }
-        
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+
         let fileName = "\(UUID().uuidString).jpg"
         let fileURL = documentsDirectory.appendingPathComponent(fileName)
-        
+
         do {
             try imageData.write(to: fileURL)
             return fileURL
         } catch {
-            print("Failed to save image: \(error)")
             return nil
         }
     }

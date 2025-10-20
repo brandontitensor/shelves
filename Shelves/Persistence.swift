@@ -6,6 +6,11 @@
 //
 
 import CoreData
+import Foundation
+
+extension Notification.Name {
+    static let coreDataRecoveryRequired = Notification.Name("coreDataRecoveryRequired")
+}
 
 struct PersistenceController {
     static let shared = PersistenceController()
@@ -27,7 +32,8 @@ struct PersistenceController {
             try viewContext.save()
         } catch {
             let nsError = error as NSError
-            fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+            print("Preview data save error: \(nsError), \(nsError.userInfo)")
+            // Preview failures are non-critical, continue without sample data
         }
         return result
     }()
@@ -36,13 +42,16 @@ struct PersistenceController {
 
     init(inMemory: Bool = false) {
         container = NSPersistentContainer(name: "Shelves")
+
         if inMemory {
-            container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
+            if let description = container.persistentStoreDescriptions.first {
+                description.url = URL(fileURLWithPath: "/dev/null")
+            }
         }
+
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
+                print("⚠️ Core Data store loading error: \(error), \(error.userInfo)")
 
                 /*
                  Typical reasons for an error here include:
@@ -50,9 +59,30 @@ struct PersistenceController {
                  * The persistent store is not accessible, due to permissions or data protection when the device is locked.
                  * The device is out of space.
                  * The store could not be migrated to the current model version.
-                 Check the error message to determine what the actual problem was.
                  */
-                fatalError("Unresolved error \(error), \(error.userInfo)")
+
+                // Attempt to recover by deleting the corrupted store
+                var recoveryMessage = ""
+                if let storeURL = storeDescription.url {
+                    print("🔄 Attempting to recover by deleting corrupted store at: \(storeURL)")
+                    do {
+                        try FileManager.default.removeItem(at: storeURL)
+                        print("✅ Successfully deleted corrupted store. App will restart with fresh database.")
+                        recoveryMessage = "Your library database was corrupted and has been reset. You'll need to re-import your books."
+                    } catch {
+                        print("❌ Failed to delete corrupted store: \(error.localizedDescription)")
+                        recoveryMessage = "Unable to access your library database. Please restart the app."
+                    }
+                }
+
+                // Notify the app about the recovery so it can show an alert
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: .coreDataRecoveryRequired,
+                        object: nil,
+                        userInfo: ["message": recoveryMessage]
+                    )
+                }
             }
         })
         container.viewContext.automaticallyMergesChangesFromParent = true

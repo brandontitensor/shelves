@@ -4,6 +4,7 @@ import CoreData
 struct SettingsView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var developerSettings: DeveloperSettings
     @State private var exportFormat: ExportFormat = .csv
     @State private var showingLibraryManagement = false
     @State private var showingDuplicateDetection = false
@@ -14,9 +15,12 @@ struct SettingsView: View {
     @State private var showingClearDataAlert = false
     @State private var showingBulkImport = false
     @State private var showingReadingReminderSettings = false
-    
-    // Development settings - can be disabled for production
-    private let isDevelopmentMode = true
+    @State private var showingDeveloperTools = false
+
+    // Secret gesture state for developer mode
+    @State private var versionTapCount = 0
+    @State private var lastTapTime = Date()
+    @State private var showDeveloperModeToast = false
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.title, ascending: true)],
@@ -34,9 +38,14 @@ struct SettingsView: View {
                             librarySection
                             dataSection
                             aboutSection
-                            
-                            // Development section (only shown in development mode)
-                            if isDevelopmentMode {
+
+                            // Developer Tools (only shown when developer mode is enabled)
+                            if developerSettings.isDeveloperModeEnabled {
+                                developerToolsSection
+                            }
+
+                            // Development section (only shown if feature flags are enabled)
+                            if developerSettings.showTestDataGenerator || developerSettings.showClearDataOption || developerSettings.showLibraryStats {
                                 developmentSection
                             }
                         }
@@ -175,6 +184,18 @@ struct SettingsView: View {
                 ) {
                     performManualBackup()
                 }
+
+                Divider()
+                    .background(ShelvesDesign.Colors.paleBeige)
+
+                SettingsButton(
+                    title: "Delete All Data",
+                    subtitle: "Permanently remove all books",
+                    icon: "trash.fill",
+                    isDestructive: true
+                ) {
+                    showingClearDataAlert = true
+                }
             }
         }
     }
@@ -187,14 +208,42 @@ struct SettingsView: View {
             iconColor: ShelvesDesign.Colors.chestnut
         ) {
             VStack(spacing: ShelvesDesign.Spacing.md) {
-                SettingsButton(
-                    title: "Version 1.0.0",
-                    subtitle: "Check for updates",
-                    icon: "arrow.triangle.2.circlepath"
-                ) {
-                    checkForUpdates()
+                // Version number with secret gesture (tap 7 times to enable developer mode)
+                Button {
+                    handleVersionTap()
+                } label: {
+                    HStack(spacing: ShelvesDesign.Spacing.md) {
+                        Image(systemName: developerSettings.isDeveloperModeEnabled ? "hammer.fill" : "arrow.triangle.2.circlepath")
+                            .font(.system(size: 18))
+                            .foregroundColor(developerSettings.isDeveloperModeEnabled ? .orange : ShelvesDesign.Colors.chestnut)
+                            .frame(width: 24)
+
+                        VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
+                            Text("Version 1.1")
+                                .font(ShelvesDesign.Typography.labelLarge)
+                                .foregroundColor(ShelvesDesign.Colors.text)
+
+                            Text(developerSettings.isDeveloperModeEnabled ? "Developer Mode Active" : "Tap to check for updates")
+                                .font(ShelvesDesign.Typography.bodySmall)
+                                .foregroundColor(ShelvesDesign.Colors.sepia)
+                        }
+
+                        Spacer()
+
+                        if developerSettings.isDeveloperModeEnabled {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.green)
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(ShelvesDesign.Colors.slateGray.opacity(0.6))
+                        }
+                    }
+                    .padding(.vertical, ShelvesDesign.Spacing.sm)
                 }
-                
+                .buttonStyle(PlainButtonStyle())
+
                 SettingsButton(
                     title: "Help & Support",
                     subtitle: "Get help using Shelves",
@@ -210,7 +259,15 @@ struct SettingsView: View {
                 ) {
                     openPrivacyPolicy()
                 }
-                
+
+                SettingsButton(
+                    title: "Terms & Conditions",
+                    subtitle: "App usage terms and agreements",
+                    icon: "doc.text"
+                ) {
+                    openTermsAndConditions()
+                }
+
                 SettingsButton(
                     title: "Rate Shelves",
                     subtitle: "Share your thoughts on the App Store",
@@ -237,6 +294,31 @@ struct SettingsView: View {
             ReadingReminderSettingsView()
                 .environmentObject(themeManager)
         }
+        .sheet(isPresented: $showingDeveloperTools) {
+            DeveloperToolsView()
+                .environmentObject(developerSettings)
+        }
+        .overlay(
+            Group {
+                if showDeveloperModeToast {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Image(systemName: developerSettings.isDeveloperModeEnabled ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundColor(developerSettings.isDeveloperModeEnabled ? .green : .orange)
+                            Text(developerSettings.isDeveloperModeEnabled ? "Developer Mode Enabled" : "Developer Mode Disabled")
+                                .font(ShelvesDesign.Typography.labelLarge)
+                        }
+                        .padding()
+                        .background(ShelvesDesign.Colors.warmBlack.opacity(0.9))
+                        .foregroundColor(.white)
+                        .cornerRadius(ShelvesDesign.CornerRadius.medium)
+                        .padding(.bottom, 100)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+        )
         .confirmationDialog("Export Library", isPresented: $showingExportSheet) {
             Button("Export as CSV") { exportLibrary(format: .csv) }
             Button("Export as JSON") { exportLibrary(format: .json) }
@@ -249,7 +331,63 @@ struct SettingsView: View {
             Text("Your library has been backed up successfully.")
         }
     }
-    
+
+    private var developerToolsSection: some View {
+        SettingsCard(
+            title: "Developer Tools",
+            subtitle: "Configure development features",
+            icon: "wrench.and.screwdriver.fill",
+            iconColor: .purple
+        ) {
+            VStack(spacing: ShelvesDesign.Spacing.md) {
+                SettingsButton(
+                    title: "Feature Flags",
+                    subtitle: "Control which dev features are visible",
+                    icon: "flag.fill"
+                ) {
+                    showingDeveloperTools = true
+                }
+
+                Divider()
+                    .background(ShelvesDesign.Colors.paleBeige)
+
+                // Show current feature status
+                VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.sm) {
+                    Text("Active Features")
+                        .font(ShelvesDesign.Typography.headlineSmall)
+                        .foregroundColor(ShelvesDesign.Colors.text)
+
+                    HStack {
+                        Image(systemName: developerSettings.showTestDataGenerator ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(developerSettings.showTestDataGenerator ? .green : .gray)
+                        Text("Test Data Generator")
+                            .font(ShelvesDesign.Typography.bodySmall)
+                            .foregroundColor(ShelvesDesign.Colors.sepia)
+                        Spacer()
+                    }
+
+                    HStack {
+                        Image(systemName: developerSettings.showClearDataOption ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(developerSettings.showClearDataOption ? .green : .gray)
+                        Text("Clear Data Option")
+                            .font(ShelvesDesign.Typography.bodySmall)
+                            .foregroundColor(ShelvesDesign.Colors.sepia)
+                        Spacer()
+                    }
+
+                    HStack {
+                        Image(systemName: developerSettings.showLibraryStats ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(developerSettings.showLibraryStats ? .green : .gray)
+                        Text("Library Statistics")
+                            .font(ShelvesDesign.Typography.bodySmall)
+                            .foregroundColor(ShelvesDesign.Colors.sepia)
+                        Spacer()
+                    }
+                }
+            }
+        }
+    }
+
     private var developmentSection: some View {
         SettingsCard(
             title: "Development Tools",
@@ -258,44 +396,42 @@ struct SettingsView: View {
             iconColor: Color.orange
         ) {
             VStack(spacing: ShelvesDesign.Spacing.md) {
-                // Book count display
-                HStack {
-                    VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
-                        Text("Current Library Size")
-                            .font(ShelvesDesign.Typography.labelLarge)
-                            .foregroundColor(ShelvesDesign.Colors.text)
-                        
-                        Text("\(books.count) books in library")
-                            .font(ShelvesDesign.Typography.bodySmall)
-                            .foregroundColor(ShelvesDesign.Colors.sepia)
+                // Show test data generator if enabled
+                if developerSettings.showTestDataGenerator {
+                    SettingsButton(
+                        title: "Populate Test Library",
+                        subtitle: "Add 100 sample books for testing",
+                        icon: "books.vertical"
+                    ) {
+                        showingTestDataAlert = true
                     }
-                    
-                    Spacer()
+
+                    if developerSettings.showClearDataOption || developerSettings.showLibraryStats {
+                        Divider()
+                            .background(ShelvesDesign.Colors.paleBeige)
+                    }
                 }
-                .padding(.vertical, ShelvesDesign.Spacing.sm)
-                
-                Divider()
-                    .background(ShelvesDesign.Colors.paleBeige)
-                
-                SettingsButton(
-                    title: "Populate Test Library",
-                    subtitle: "Add 100 sample books for testing",
-                    icon: "books.vertical"
-                ) {
-                    showingTestDataAlert = true
+
+                // Show clear data option if enabled
+                if developerSettings.showClearDataOption {
+                    SettingsButton(
+                        title: "Clear All Books",
+                        subtitle: "Remove all books from library",
+                        icon: "trash"
+                    ) {
+                        showingClearDataAlert = true
+                    }
+
+                    if developerSettings.showLibraryStats {
+                        Divider()
+                            .background(ShelvesDesign.Colors.paleBeige)
+                    }
                 }
-                
-                SettingsButton(
-                    title: "Clear All Books",
-                    subtitle: "Remove all books from library",
-                    icon: "trash"
-                ) {
-                    showingClearDataAlert = true
-                }
-                
-                // Library statistics
-                VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
-                    Text("Quick Stats")
+
+                // Show library statistics if enabled
+                if developerSettings.showLibraryStats {
+                    VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
+                        Text("Quick Stats")
                         .font(ShelvesDesign.Typography.headlineSmall)
                         .foregroundColor(ShelvesDesign.Colors.text)
                     
@@ -309,6 +445,7 @@ struct SettingsView: View {
                         StatItem(label: "Reading", value: "\(currentlyReading)")
                         StatItem(label: "Genres", value: "\(genres)")
                         StatItem(label: "Libraries", value: "\(libraries)")
+                    }
                     }
                 }
             }
@@ -346,7 +483,7 @@ struct SettingsView: View {
             } else {
                 DispatchQueue.main.async {
                     self.isExporting = false
-                    print("Export failed")
+                    // Export failed
                 }
             }
         }
@@ -373,17 +510,23 @@ struct SettingsView: View {
     }
     
     private func openHelpAndSupport() {
-        if let url = URL(string: "mailto:support@shelves.app?subject=Shelves%20Support") {
+        if let url = URL(string: "mailto:support@titanlabstech.net?subject=Shelves%20Support") {
             UIApplication.shared.open(url)
         }
     }
     
     private func openPrivacyPolicy() {
-        if let url = URL(string: "https://shelves.app/privacy") {
+        if let url = URL(string: "https://titanlabstech.net/apps/shelves-privacy") {
             UIApplication.shared.open(url)
         }
     }
-    
+
+    private func openTermsAndConditions() {
+        if let url = URL(string: "https://titanlabstech.net/apps/shelves-terms") {
+            UIApplication.shared.open(url)
+        }
+    }
+
     private func rateApp() {
         if let url = URL(string: "https://apps.apple.com/app/id1234567890?action=write-review") {
             UIApplication.shared.open(url)
@@ -391,7 +534,41 @@ struct SettingsView: View {
     }
     
     // MARK: - Development Methods
-    
+
+    private func handleVersionTap() {
+        let now = Date()
+
+        // Reset tap count if more than 2 seconds since last tap
+        if now.timeIntervalSince(lastTapTime) > 2 {
+            versionTapCount = 0
+        }
+
+        lastTapTime = now
+        versionTapCount += 1
+
+        // Enable developer mode after 7 taps
+        if versionTapCount >= 7 {
+            developerSettings.isDeveloperModeEnabled.toggle()
+            versionTapCount = 0
+
+            // Show toast notification
+            withAnimation(.spring()) {
+                showDeveloperModeToast = true
+            }
+
+            // Provide haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+
+            // Hide toast after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation(.spring()) {
+                    showDeveloperModeToast = false
+                }
+            }
+        }
+    }
+
     private func populateTestLibrary() {
         TestDataGenerator.shared.populateTestLibrary(context: viewContext)
     }
@@ -403,9 +580,8 @@ struct SettingsView: View {
         do {
             try viewContext.execute(deleteRequest)
             try viewContext.save()
-            print("Successfully cleared all books")
         } catch {
-            print("Failed to clear books: \(error)")
+            // Failed to clear books
         }
     }
 }
@@ -460,28 +636,29 @@ struct SettingsButton: View {
     let title: String
     let subtitle: String
     let icon: String
+    var isDestructive: Bool = false
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: ShelvesDesign.Spacing.md) {
                 Image(systemName: icon)
                     .font(.system(size: 18))
-                    .foregroundColor(ShelvesDesign.Colors.chestnut)
+                    .foregroundColor(isDestructive ? .red : ShelvesDesign.Colors.chestnut)
                     .frame(width: 24)
-                
+
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
                     Text(title)
                         .font(ShelvesDesign.Typography.labelLarge)
-                        .foregroundColor(ShelvesDesign.Colors.text)
-                    
+                        .foregroundColor(isDestructive ? .red : ShelvesDesign.Colors.text)
+
                     Text(subtitle)
                         .font(ShelvesDesign.Typography.bodySmall)
                         .foregroundColor(ShelvesDesign.Colors.sepia)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(ShelvesDesign.Colors.slateGray.opacity(0.6))

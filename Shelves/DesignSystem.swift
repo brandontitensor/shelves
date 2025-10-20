@@ -88,6 +88,20 @@ struct ShelvesDesign {
         static let card = (color: Colors.cardShadow, radius: CGFloat(8), x: CGFloat(0), y: CGFloat(4))
         static let book = (color: Colors.softShadow, radius: CGFloat(6), x: CGFloat(2), y: CGFloat(4))
     }
+
+    // MARK: - Utilities
+    static func bookSpineColor(for book: Book) -> Color {
+        let colors = [
+            Colors.burgundy,
+            Colors.forestGreen,
+            Colors.navy,
+            Colors.deepMaroon,
+            Colors.chestnut
+        ]
+
+        let hash = book.title?.hashValue ?? 0
+        return colors[abs(hash) % colors.count]
+    }
 }
 
 // MARK: - Custom Modifiers

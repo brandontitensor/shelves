@@ -37,15 +37,15 @@ struct HorizontalActionButton: View {
             icon: "checkmark.circle.fill",
             color: .green
         ) {
-            print("Mark Read tapped")
+            // Action handler
         }
-        
+
         HorizontalActionButton(
             title: "View Details",
             icon: "info.circle.fill",
             color: .blue
         ) {
-            print("View Details tapped")
+            // Action handler
         }
     }
     .padding()

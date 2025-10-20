@@ -73,30 +73,33 @@ struct ThemeColors {
 
 class ThemeManager: ObservableObject {
     static let shared = ThemeManager()
-    
+
+    private var isRequestingNotificationPermission = false
+
     @Published var currentTheme: AppTheme {
         didSet {
             UserDefaults.standard.set(currentTheme.rawValue, forKey: "selectedTheme")
-            print("🎨 Theme changed to: \(currentTheme.rawValue)")
         }
     }
     
     @Published var notificationsEnabled: Bool {
         didSet {
             UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled")
-            if notificationsEnabled {
+            if notificationsEnabled && !isRequestingNotificationPermission {
+                isRequestingNotificationPermission = true
                 Task {
                     let granted = await NotificationManager.shared.requestPermission()
-                    if granted {
-                        NotificationManager.shared.scheduleReadingReminders()
-                    } else {
-                        // Permission denied, revert the toggle
-                        await MainActor.run {
+                    await MainActor.run {
+                        self.isRequestingNotificationPermission = false
+                        if granted {
+                            NotificationManager.shared.scheduleReadingReminders()
+                        } else {
+                            // Permission denied, revert the toggle
                             self.notificationsEnabled = false
                         }
                     }
                 }
-            } else {
+            } else if !notificationsEnabled {
                 NotificationManager.shared.cancelReadingReminders()
             }
         }

@@ -683,20 +683,6 @@ struct BookCoverCard: View {
     }
 }
     
-    private func bookSpineColor(for book: Book) -> Color {
-        let colors = [
-            ShelvesDesign.Colors.burgundy,
-            ShelvesDesign.Colors.forestGreen,
-            ShelvesDesign.Colors.navy,
-            ShelvesDesign.Colors.deepMaroon,
-            ShelvesDesign.Colors.chestnut
-        ]
-        
-        let hash = book.title?.hashValue ?? 0
-        return colors[abs(hash) % colors.count]
-    }
-
-
 struct BookSpineRow: View {
     let book: Book
     @EnvironmentObject private var libraryView: LibraryViewEnvironment
@@ -791,19 +777,6 @@ struct BookSpineRow: View {
                 EmptyView()
             }
         }
-    }
-    
-    private func bookSpineColor(for book: Book) -> Color {
-        let colors = [
-            ShelvesDesign.Colors.burgundy,
-            ShelvesDesign.Colors.forestGreen,
-            ShelvesDesign.Colors.navy,
-            ShelvesDesign.Colors.deepMaroon,
-            ShelvesDesign.Colors.chestnut
-        ]
-        
-        let hash = book.title?.hashValue ?? 0
-        return colors[abs(hash) % colors.count]
     }
 }
 

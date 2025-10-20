@@ -43,22 +43,21 @@ struct AddBookView: View {
     
     private let bookSizes = ["Pocket", "Mass Market", "Trade Paperback", "Hardcover", "Large Print", "Unknown"]
     private let bookFormats = ["Physical", "Ebook", "Audiobook"]
-    
+
     private var predefinedLibraries: [String] {
         ["Home Library", "Work Library", "Vacation Reading"]
     }
-    
+
+    @FetchRequest(
+        sortDescriptors: [],
+        animation: .default)
+    private var allBooksForLibraries: FetchedResults<Book>
+
     private var availableLibraries: [String] {
-        // Get existing libraries from Core Data
-        let request: NSFetchRequest<Book> = Book.fetchRequest()
-        do {
-            let books = try viewContext.fetch(request)
-            let existingLibraries = Set(books.compactMap { $0.libraryName })
-            let allLibraries = Set(predefinedLibraries).union(existingLibraries)
-            return Array(allLibraries).sorted() + ["Add New Library..."]
-        } catch {
-            return predefinedLibraries + ["Add New Library..."]
-        }
+        // Use existing FetchRequest instead of manual fetch
+        let existingLibraries = Set(allBooksForLibraries.compactMap { $0.libraryName })
+        let allLibraries = Set(predefinedLibraries).union(existingLibraries)
+        return Array(allLibraries).sorted() + ["Add New Library..."]
     }
     
     var body: some View {
@@ -159,11 +158,20 @@ struct AddBookView: View {
             TextField("ISBN (enter to auto-fill)", text: $isbnText)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .keyboardType(.numberPad)
                 .onSubmit {
-                    if !isbnText.isEmpty {
+                    if !isbnText.isEmpty && isValidISBN(isbnText) {
                         fetchBookData(isbn: isbnText)
+                    } else if !isbnText.isEmpty {
+                        errorMessage = "Invalid ISBN format. ISBN should be 10 or 13 digits."
                     }
                 }
+
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
             
             // Book Format Picker
             Picker("Format", selection: $format) {
@@ -333,33 +341,37 @@ struct AddBookView: View {
         }
     }
     
+    private func isValidISBN(_ isbn: String) -> Bool {
+        let cleanISBN = isbn.replacingOccurrences(of: "-", with: "")
+                           .replacingOccurrences(of: " ", with: "")
+        return cleanISBN.count == 10 || cleanISBN.count == 13
+    }
+
     private func fetchBookData(isbn: String) {
+        guard isValidISBN(isbn) else {
+            errorMessage = "Invalid ISBN format. ISBN should be 10 or 13 digits."
+            return
+        }
+
         isLoading = true
         errorMessage = ""
-        
+
         Task {
             do {
-                if let bookData = try await OpenLibraryService.shared.fetchBookData(isbn: isbn) {
-                    await MainActor.run {
-                        title = bookData.title
-                        author = bookData.author
-                        publishedDate = bookData.publishedDate ?? ""
-                        pageCount = bookData.pageCount.map(String.init) ?? ""
-                        genre = bookData.genre ?? ""
-                        summary = bookData.summary ?? ""
-                        coverImageURL = bookData.coverImageURL
-                        isLoading = false
-                        print("🖼️ Fetched book data and cover for: \(bookData.title)")
-                    }
-                } else {
-                    await MainActor.run {
-                        errorMessage = "Book not found"
-                        isLoading = false
-                    }
+                let bookData = try await OpenLibraryService.shared.fetchBookData(isbn: isbn)
+                await MainActor.run {
+                    title = bookData.title
+                    author = bookData.author
+                    publishedDate = bookData.publishedDate ?? ""
+                    pageCount = bookData.pageCount.map(String.init) ?? ""
+                    genre = bookData.genre ?? ""
+                    summary = bookData.summary ?? ""
+                    coverImageURL = bookData.coverImageURL
+                    isLoading = false
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Failed to fetch book data: \(error.localizedDescription)"
+                    errorMessage = error.localizedDescription
                     isLoading = false
                 }
             }
@@ -367,42 +379,37 @@ struct AddBookView: View {
     }
     
     private func saveBook() {
-        print("📚 Starting save process...")
-        print("📝 Title: '\(title)' (isEmpty: \(title.isEmpty))")
-        print("👤 Author: '\(author)'")
-        
         // Check for duplicates first
         checkForDuplicates { shouldProceed in
-            print("🔍 Duplicate check result: shouldProceed = \(shouldProceed)")
             if shouldProceed {
                 performSave()
-            } else {
-                print("⚠️ Save cancelled due to duplicate detection")
             }
         }
     }
     
     private func checkForDuplicates(completion: @escaping (Bool) -> Void) {
         let request: NSFetchRequest<Book> = Book.fetchRequest()
-        
+
         var predicates: [NSPredicate] = []
-        
-        // Check for same title and author
-        if !title.isEmpty && !author.isEmpty {
-            predicates.append(NSPredicate(format: "title CONTAINS[cd] %@ AND author CONTAINS[cd] %@", title, author))
-        }
-        
-        // Check for same ISBN if provided
+
+        // Check for exact ISBN match (most reliable)
         if !isbnText.isEmpty {
             predicates.append(NSPredicate(format: "isbn == %@", isbnText))
         }
-        
+
+        // Check for exact title and author match
+        if !title.isEmpty && !author.isEmpty {
+            predicates.append(NSPredicate(format: "title ==[cd] %@ AND author ==[cd] %@", title, author))
+        } else if !title.isEmpty {
+            // If no author, check title only
+            predicates.append(NSPredicate(format: "title ==[cd] %@", title))
+        }
+
         if !predicates.isEmpty {
             request.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
-            
+
             do {
                 let results = try viewContext.fetch(request)
-                print("🔍 Found \(results.count) potential duplicates")
                 if !results.isEmpty {
                     duplicateBooks = results
                     showingDuplicateAlert = true
@@ -410,17 +417,14 @@ struct AddBookView: View {
                     return
                 }
             } catch {
-                print("Error checking for duplicates: \(error)")
+                // Error checking for duplicates - proceed with save anyway
             }
-        } else {
-            print("🔍 No predicates for duplicate checking - proceeding with save")
         }
-        
+
         completion(true)
     }
     
     private func performSave() {
-        print("💾 performSave() called - creating new book...")
         let newBook = Book(context: viewContext)
         newBook.id = UUID()
         newBook.title = title
@@ -455,30 +459,30 @@ struct AddBookView: View {
         
         do {
             try viewContext.save()
-            print("✅ Book saved successfully to Core Data")
-            
+
             // Ensure the alert shows and then dismisses the view
             DispatchQueue.main.async {
                 self.showingSaveConfirmation = true
             }
         } catch {
-            print("❌ Failed to save book: \(error.localizedDescription)")
             errorMessage = "Failed to save book: \(error.localizedDescription)"
         }
     }
     
     private func saveImageToDocuments(_ image: UIImage) -> URL? {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return nil }
-        
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+
         let fileName = "\(UUID().uuidString).jpg"
         let fileURL = documentsDirectory.appendingPathComponent(fileName)
-        
+
         do {
             try imageData.write(to: fileURL)
             return fileURL
         } catch {
-            print("Failed to save image: \(error)")
             return nil
         }
     }

@@ -4,14 +4,16 @@ import CoreData
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var themeManager: ThemeManager
-    @StateObject private var userManager = UserManager.shared
-    
+    @EnvironmentObject var userManager: UserManager
+    @State private var showSaveErrorAlert = false
+    @State private var saveErrorMessage = ""
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)],
         predicate: NSPredicate(format: "currentlyReading == YES"),
         animation: .default)
     private var currentlyReadingBooks: FetchedResults<Book>
-    
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)],
         animation: .default)
@@ -28,22 +30,23 @@ struct HomeView: View {
     
     private var carouselBooks: [Book] {
         var books: [Book] = []
-        
+
         // Add currently reading books
         books.append(contentsOf: currentlyReadingBooks)
-        
+
         // Add recent additions (last 5 books)
         let recentBooks = allBooks.prefix(5).filter { !$0.currentlyReading }
         books.append(contentsOf: recentBooks)
-        
+
         // Add some random older books if we don't have enough
         if books.count < 3 {
+            let booksSet = Set(books.map { $0.objectID })
             let otherBooks = allBooks.filter { book in
-                !books.contains(book) && !book.currentlyReading
+                !booksSet.contains(book.objectID) && !book.currentlyReading
             }
             books.append(contentsOf: otherBooks.prefix(3 - books.count))
         }
-        
+
         return Array(books.prefix(6)) // Limit to 6 books for performance
     }
     
@@ -57,7 +60,7 @@ struct HomeView: View {
                         // Personalized header
                         personalizedHeader
                             .padding(.top, ShelvesDesign.Spacing.md)
-                        
+
                         if let featured = featuredBook {
                             fullScreenBookDisplay(book: featured)
                         } else {
@@ -66,6 +69,11 @@ struct HomeView: View {
                     }
                 )
                 .navigationBarHidden(true)
+        }
+        .alert("Save Error", isPresented: $showSaveErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
         }
     }
     
@@ -229,7 +237,21 @@ struct HomeView: View {
         withAnimation(.easeInOut(duration: 0.3)) {
             book.isRead = true
             book.currentlyReading = false
-            try? viewContext.save()
+            book.dateRead = Date()
+
+            do {
+                try viewContext.save()
+            } catch {
+                // Revert changes on error
+                book.isRead = false
+                book.currentlyReading = true
+                book.dateRead = nil
+                viewContext.rollback()
+
+                // Show user-facing error alert
+                saveErrorMessage = "Unable to save changes: \(error.localizedDescription)"
+                showSaveErrorAlert = true
+            }
         }
     }
 }

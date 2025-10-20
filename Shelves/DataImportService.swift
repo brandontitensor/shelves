@@ -124,10 +124,21 @@ class DataImportService {
                 errors.append("Row \(index + 2): \(error.localizedDescription)")
             }
         }
-        
+
         // Save books to Core Data
-        await saveBooksToContext(importedBooks, context: context)
-        
+        do {
+            try await saveBooksToContext(importedBooks, context: context)
+        } catch {
+            errors.append("Failed to save books to database: \(error.localizedDescription)")
+            return ImportResult(
+                successCount: 0,
+                failedCount: importedBooks.count,
+                duplicateCount: duplicateCount,
+                errors: errors,
+                importedBooks: []
+            )
+        }
+
         return ImportResult(
             successCount: successCount,
             failedCount: failedCount,
@@ -191,9 +202,22 @@ class DataImportService {
                     errors.append("Book \(index + 1): \(error.localizedDescription)")
                 }
             }
-            
-            await saveBooksToContext(importedBooks, context: context)
-            
+
+            // Save books to Core Data
+            do {
+                try await saveBooksToContext(importedBooks, context: context)
+            } catch {
+                var finalErrors = errors
+                finalErrors.append("Failed to save books to database: \(error.localizedDescription)")
+                return ImportResult(
+                    successCount: 0,
+                    failedCount: importedBooks.count,
+                    duplicateCount: duplicateCount,
+                    errors: finalErrors,
+                    importedBooks: []
+                )
+            }
+
             return ImportResult(
                 successCount: successCount,
                 failedCount: failedCount,
@@ -201,7 +225,7 @@ class DataImportService {
                 errors: errors,
                 importedBooks: importedBooks
             )
-            
+
         } catch {
             return ImportResult(
                 successCount: 0,
@@ -234,9 +258,22 @@ class DataImportService {
                 successCount += 1
             }
         }
-        
-        await saveBooksToContext(importedBooks, context: context)
-        
+
+        // Save books to Core Data
+        do {
+            try await saveBooksToContext(importedBooks, context: context)
+        } catch {
+            var finalErrors = errors
+            finalErrors.append("Failed to save books to database: \(error.localizedDescription)")
+            return ImportResult(
+                successCount: 0,
+                failedCount: importedBooks.count,
+                duplicateCount: duplicateCount,
+                errors: finalErrors,
+                importedBooks: []
+            )
+        }
+
         return ImportResult(
             successCount: successCount,
             failedCount: failedCount,
@@ -421,10 +458,11 @@ class DataImportService {
         }
     }
     
-    private func saveBooksToContext(_ books: [ImportedBook], context: NSManagedObjectContext) async {
-        await context.perform {
+    private func saveBooksToContext(_ books: [ImportedBook], context: NSManagedObjectContext) async throws {
+        try await context.perform {
             for importedBook in books {
                 let book = Book(context: context)
+                book.id = UUID()
                 book.title = importedBook.title
                 book.author = importedBook.author
                 book.isbn = importedBook.isbn
@@ -440,17 +478,12 @@ class DataImportService {
                 book.isOwned = importedBook.isOwned
                 book.isWantToBuy = importedBook.isWantToBuy
                 book.currentlyReading = importedBook.currentlyReading
-                
+
                 // Set image URL placeholder
                 book.coverImageURL = nil
             }
-            
-            do {
-                try context.save()
-                print("Successfully imported \(books.count) books")
-            } catch {
-                print("Failed to save imported books: \(error)")
-            }
+
+            try context.save()
         }
     }
 }

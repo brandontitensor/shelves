@@ -181,6 +181,7 @@ class BarcodeScannerViewController: UIViewController {
     private var captureSession: AVCaptureSession!
     private var previewLayer: AVCaptureVideoPreviewLayer!
     private var hasScanned = false
+    private let scanLock = NSLock()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -190,7 +191,9 @@ class BarcodeScannerViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        scanLock.lock()
         hasScanned = false
+        scanLock.unlock()
         startSession()
     }
     
@@ -198,7 +201,20 @@ class BarcodeScannerViewController: UIViewController {
         super.viewWillDisappear(animated)
         stopSession()
     }
-    
+
+    deinit {
+        // Ensure capture session is fully stopped and cleaned up
+        if let session = captureSession {
+            if session.isRunning {
+                session.stopRunning()
+            }
+            // Remove all inputs and outputs
+            session.inputs.forEach { session.removeInput($0) }
+            session.outputs.forEach { session.removeOutput($0) }
+        }
+        delegate = nil
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = view.layer.bounds
@@ -272,20 +288,26 @@ class BarcodeScannerViewController: UIViewController {
 
 extension BarcodeScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        // Prevent multiple scans
-        guard !hasScanned else { return }
-        
+        // Prevent multiple scans with thread-safe check
+        scanLock.lock()
+        let alreadyScanned = hasScanned
+        if !alreadyScanned {
+            hasScanned = true
+        }
+        scanLock.unlock()
+
+        guard !alreadyScanned else { return }
+
         if let metadataObject = metadataObjects.first {
             guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
             guard let stringValue = readableObject.stringValue else { return }
-            
-            hasScanned = true
+
             stopSession()
-            
+
             // Provide haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
-            
+
             // Small delay to ensure user sees the scan happened
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 self.delegate?.didScanBarcode(stringValue)

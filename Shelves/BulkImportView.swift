@@ -60,8 +60,9 @@ struct BulkImportView: View {
                 if let url = urls.first {
                     selectedFileURL = url
                 }
-            case .failure(let error):
-                print("File selection failed: \(error)")
+            case .failure:
+                // File selection failed
+                break
             }
         }
         .sheet(isPresented: $showingImportResult) {
@@ -273,7 +274,7 @@ struct BulkImportView: View {
                 return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
             }
         } catch {
-            print("Error getting file size: \(error)")
+            // Error getting file size
         }
         return nil
     }

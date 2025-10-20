@@ -139,9 +139,7 @@ class TestDataGenerator {
     func populateTestLibrary(context: NSManagedObjectContext) {
         // Clear existing books first
         clearAllBooks(context: context)
-        
-        print("📚 Starting to populate test library with cover art...")
-        
+
         // Add all test books asynchronously to fetch cover art
         Task {
             for (index, bookData) in testBooks.enumerated() {
@@ -187,22 +185,18 @@ class TestDataGenerator {
                 // Fetch cover art if ISBN is available
                 if let isbn = bookData.isbn {
                     do {
-                        if let fetchedBookData = try await OpenLibraryService.shared.fetchBookData(isbn: isbn) {
-                            await MainActor.run {
-                                // Find the book we just created and update its cover
-                                let request = Book.fetchRequest()
-                                request.predicate = NSPredicate(format: "isbn == %@", isbn)
-                                
-                                if let books = try? context.fetch(request), let bookToUpdate = books.first {
-                                    bookToUpdate.coverImageURL = fetchedBookData.coverImageURL
-                                    print("🖼️ Fetched cover for: \(bookData.title)")
-                                }
+                        let fetchedBookData = try await OpenLibraryService.shared.fetchBookData(isbn: isbn)
+                        await MainActor.run {
+                            // Find the book we just created and update its cover
+                            let request = Book.fetchRequest()
+                            request.predicate = NSPredicate(format: "isbn == %@", isbn)
+
+                            if let books = try? context.fetch(request), let bookToUpdate = books.first {
+                                bookToUpdate.coverImageURL = fetchedBookData.coverImageURL
                             }
-                        } else {
-                            print("⚠️ No cover found for: \(bookData.title)")
                         }
                     } catch {
-                        print("❌ Failed to fetch cover for \(bookData.title): \(error)")
+                        // Failed to fetch cover
                     }
                 }
                 
@@ -216,9 +210,8 @@ class TestDataGenerator {
             await MainActor.run {
                 do {
                     try context.save()
-                    print("✅ Successfully populated test library with \(testBooks.count) books and cover art")
                 } catch {
-                    print("❌ Failed to save test books: \(error)")
+                    // Failed to save test books
                 }
             }
         }
@@ -231,9 +224,8 @@ class TestDataGenerator {
         do {
             try context.execute(deleteRequest)
             try context.save()
-            print("Cleared existing books from library")
         } catch {
-            print("Failed to clear existing books: \(error)")
+            // Failed to clear existing books
         }
     }
     

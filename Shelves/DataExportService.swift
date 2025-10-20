@@ -93,9 +93,9 @@ class DataExportService {
                 return saveToFile(content: jsonString, fileName: "library_export.json")
             }
         } catch {
-            print("Error creating JSON: \(error)")
+            return nil
         }
-        
+
         return nil
     }
     
@@ -139,14 +139,43 @@ class DataExportService {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            print("Error saving file: \(error)")
             return nil
         }
     }
     
     func backupToiCloud() {
-        // Placeholder for iCloud backup functionality
-        print("Backup to iCloud initiated")
+        // Export to JSON and save to iCloud Drive (if available)
+        let request: NSFetchRequest<Book> = Book.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)]
+
+        guard let context = PersistenceController.shared.container.viewContext as NSManagedObjectContext? else {
+            return
+        }
+
+        do {
+            let books = try context.fetch(request)
+            guard let fileURL = exportLibrary(books: books, format: .json) else {
+                return
+            }
+
+            // Move to iCloud Drive if available
+            if let iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)?
+                .appendingPathComponent("Documents")
+                .appendingPathComponent("Shelves-Backup-\(Date().formatted(date: .abbreviated, time: .omitted)).json") {
+
+                // Create directory if needed
+                try? FileManager.default.createDirectory(at: iCloudURL.deletingLastPathComponent(),
+                                                        withIntermediateDirectories: true)
+
+                // Copy file to iCloud
+                try? FileManager.default.copyItem(at: fileURL, to: iCloudURL)
+                print("✅ Backup saved to iCloud Drive: \(iCloudURL.lastPathComponent)")
+            } else {
+                print("⚠️ iCloud Drive not available, backup saved locally only")
+            }
+        } catch {
+            print("❌ Backup failed: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -208,8 +237,8 @@ class DuplicateDetectionService {
         
         let longer = str1.count > str2.count ? str1 : str2
         let shorter = str1.count > str2.count ? str2 : str1
-        
-        if longer.count == 0 { return 1.0 }
+
+        if longer.isEmpty { return 1.0 }
         
         let editDistance = levenshteinDistance(longer, shorter)
         return Double(longer.count - editDistance) / Double(longer.count)

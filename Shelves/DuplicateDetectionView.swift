@@ -152,8 +152,15 @@ struct DuplicateDetectionView: View {
     }
     
     private func mergeDuplicates() {
-        guard let primary = primaryBook else { return }
-        
+        guard let primary = primaryBook else {
+            print("⚠️ Error: Attempted to merge duplicates without selecting a primary book")
+            return
+        }
+        guard !selectedGroup.isEmpty else {
+            print("⚠️ Error: Attempted to merge duplicates with empty group")
+            return
+        }
+
         // Keep the primary book and remove duplicates
         for book in selectedGroup {
             if book != primary {
@@ -168,7 +175,7 @@ struct DuplicateDetectionView: View {
                 duplicateGroups.remove(at: groupIndex)
             }
         } catch {
-            print("Error merging duplicates: \(error)")
+            // Error merging duplicates - could show user-facing alert
         }
     }
 }

@@ -6,7 +6,7 @@ struct OpenLibraryService {
     
     private init() {}
     
-    func fetchBookData(isbn: String) async throws -> BookData? {
+    func fetchBookData(isbn: String) async throws -> BookData {
         let cleanISBN = isbn.replacingOccurrences(of: "-", with: "")
         let urlString = "\(baseURL)/api/books?bibkeys=ISBN:\(cleanISBN)&format=json&jscmd=data"
         
@@ -22,11 +22,11 @@ struct OpenLibraryService {
         }
         
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        
+
         guard let bookDict = json?["ISBN:\(cleanISBN)"] as? [String: Any] else {
-            return nil
+            throw OpenLibraryError.noData
         }
-        
+
         return parseBookData(from: bookDict)
     }
     
@@ -150,15 +150,15 @@ enum OpenLibraryError: Error, LocalizedError {
     case invalidURL
     case networkError
     case noData
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid URL"
+            return "Invalid ISBN format. Please check and try again."
         case .networkError:
-            return "Network error occurred"
+            return "Unable to connect to the book database. Please check your internet connection and try again."
         case .noData:
-            return "No book data found"
+            return "Book not found in the database. Try manual entry or check the ISBN."
         }
     }
 }

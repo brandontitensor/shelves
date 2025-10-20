@@ -19,7 +19,7 @@ struct SearchView: View {
         case author = "Author"
         case genre = "Genre"
         case isbn = "ISBN"
-        
+
         var icon: String {
             switch self {
             case .all: return "magnifyingglass"
@@ -30,19 +30,29 @@ struct SearchView: View {
             }
         }
     }
+
+    enum QuickFilter: String {
+        case currentlyReading = "currently_reading_filter"
+        case unreadBooks = "unread_books_filter"
+        case favorites = "favorites_filter"
+        case allBooks = "*"
+    }
     
     private var searchResults: [Book] {
         guard !searchText.isEmpty else { return [] }
-        
-        // Handle special filter cases
-        if searchText == "currently_reading_filter" {
-            return allBooks.filter { $0.currentlyReading }
-        } else if searchText == "unread_books_filter" {
-            return allBooks.filter { !$0.isRead && !$0.currentlyReading }
-        } else if searchText == "favorites_filter" {
-            return allBooks.filter { $0.rating >= 4.0 }
-        } else if searchText == "*" {
-            return Array(allBooks)
+
+        // Handle special filter cases using enum
+        if let filter = QuickFilter(rawValue: searchText) {
+            switch filter {
+            case .currentlyReading:
+                return allBooks.filter { $0.currentlyReading }
+            case .unreadBooks:
+                return allBooks.filter { !$0.isRead && !$0.currentlyReading }
+            case .favorites:
+                return allBooks.filter { $0.rating >= 4.0 }
+            case .allBooks:
+                return Array(allBooks)
+            }
         }
         
         return allBooks.filter { book in
@@ -244,9 +254,9 @@ struct SearchView: View {
                     color: ShelvesDesign.Colors.burgundy
                 ) {
                     searchCategory = .all
-                    searchText = "*"
+                    searchText = QuickFilter.allBooks.rawValue
                 }
-                
+
                 QuickAccessCard(
                     title: "Currently Reading",
                     count: allBooks.filter { $0.currentlyReading }.count,
@@ -254,9 +264,9 @@ struct SearchView: View {
                     color: ShelvesDesign.Colors.forestGreen
                 ) {
                     searchCategory = .all
-                    searchText = "currently_reading_filter"
+                    searchText = QuickFilter.currentlyReading.rawValue
                 }
-                
+
                 QuickAccessCard(
                     title: "Unread Books",
                     count: allBooks.filter { !$0.isRead && !$0.currentlyReading }.count,
@@ -264,9 +274,9 @@ struct SearchView: View {
                     color: ShelvesDesign.Colors.navy
                 ) {
                     searchCategory = .all
-                    searchText = "unread_books_filter"
+                    searchText = QuickFilter.unreadBooks.rawValue
                 }
-                
+
                 QuickAccessCard(
                     title: "Favorites",
                     count: allBooks.filter { $0.rating >= 4.0 }.count,
@@ -274,7 +284,7 @@ struct SearchView: View {
                     color: ShelvesDesign.Colors.antiqueGold
                 ) {
                     searchCategory = .all
-                    searchText = "favorites_filter"
+                    searchText = QuickFilter.favorites.rawValue
                 }
             }
         }
@@ -539,20 +549,7 @@ struct SearchResultRow: View {
             WarmCardBackground()
         )
     }
-    
-    private func bookSpineColor(for book: Book) -> Color {
-        let colors = [
-            ShelvesDesign.Colors.burgundy,
-            ShelvesDesign.Colors.forestGreen,
-            ShelvesDesign.Colors.navy,
-            ShelvesDesign.Colors.deepMaroon,
-            ShelvesDesign.Colors.chestnut
-        ]
-        
-        let hash = book.title?.hashValue ?? 0
-        return colors[abs(hash) % colors.count]
-    }
-    
+
     private func highlightedText(_ text: String, searchText: String) -> AttributedString {
         var attributedString = AttributedString(text)
         

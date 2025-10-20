@@ -101,21 +101,8 @@ struct BookCoverImage: View {
         BookSpinePlaceholder(
             title: book.title ?? "",
             author: book.author ?? "",
-            color: bookSpineColor(for: book)
+            color: ShelvesDesign.bookSpineColor(for: book)
         )
-    }
-    
-    private func bookSpineColor(for book: Book) -> Color {
-        let colors = [
-            ShelvesDesign.Colors.burgundy,
-            ShelvesDesign.Colors.forestGreen,
-            ShelvesDesign.Colors.navy,
-            ShelvesDesign.Colors.deepMaroon,
-            ShelvesDesign.Colors.chestnut
-        ]
-        
-        let hash = book.title?.hashValue ?? 0
-        return colors[abs(hash) % colors.count]
     }
 }
 
@@ -160,32 +147,36 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
 }
 
-// Simple image cache for better performance
+// Thread-safe image cache for better performance
 class ImageCache: ObservableObject {
     static let shared = ImageCache()
-    
-    private var cache: [URL: Image] = [:]
-    private let maxCacheSize = 50 // Limit cache to 50 images
-    
-    private init() {}
-    
+
+    private let cache = NSCache<NSURL, CachedImage>()
+    private let maxCacheCount = 50
+
+    private init() {
+        cache.countLimit = maxCacheCount
+    }
+
     func image(for url: URL) -> Image? {
-        return cache[url]
+        return cache.object(forKey: url as NSURL)?.image
     }
-    
+
     func setImage(_ image: Image, for url: URL) {
-        // Simple LRU-like behavior: remove oldest if we exceed cache size
-        if cache.count >= maxCacheSize {
-            let oldestKey = cache.keys.first
-            if let key = oldestKey {
-                cache.removeValue(forKey: key)
-            }
-        }
-        cache[url] = image
+        cache.setObject(CachedImage(image: image), forKey: url as NSURL)
     }
-    
+
     func clearCache() {
-        cache.removeAll()
+        cache.removeAllObjects()
+    }
+}
+
+// Wrapper class to store SwiftUI Image in NSCache
+private class CachedImage {
+    let image: Image
+
+    init(image: Image) {
+        self.image = image
     }
 }
 

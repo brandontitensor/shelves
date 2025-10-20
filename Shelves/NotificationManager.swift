@@ -6,13 +6,17 @@ enum NotificationFrequency: String, CaseIterable {
     case everyOtherDay = "Every Other Day"
     case weekly = "Weekly"
     case biweekly = "Bi-weekly"
-    
-    var timeInterval: TimeInterval {
+
+    var calendarComponent: Calendar.Component {
+        return .day
+    }
+
+    var interval: Int {
         switch self {
-        case .daily: return 24 * 60 * 60 // 1 day
-        case .everyOtherDay: return 48 * 60 * 60 // 2 days
-        case .weekly: return 7 * 24 * 60 * 60 // 7 days
-        case .biweekly: return 14 * 24 * 60 * 60 // 14 days
+        case .daily: return 1
+        case .everyOtherDay: return 2
+        case .weekly: return 7
+        case .biweekly: return 14
         }
     }
 }
@@ -91,7 +95,9 @@ class NotificationManager: ObservableObject {
         let now = Date()
         
         for i in 1...30 { // Schedule for next 30 occurrences
-            let nextDate = calendar.date(byAdding: .second, value: Int(frequency.timeInterval) * i, to: now)!
+            guard let nextDate = calendar.date(byAdding: frequency.calendarComponent, value: frequency.interval * i, to: now) else {
+                continue
+            }
             let triggerDate = calendar.dateComponents([.hour, .minute, .day, .month, .year], from: nextDate)
             
             // Update trigger to use the user's preferred time
@@ -117,13 +123,10 @@ class NotificationManager: ObservableObject {
                 }
             }
         }
-        
-        print("📚 Scheduled reading reminders with frequency: \(frequency.rawValue)")
     }
-    
+
     func cancelReadingReminders() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
-        print("📚 Cancelled all reading reminders")
     }
     
     private func createNotificationContent() -> UNMutableNotificationContent? {
@@ -132,8 +135,10 @@ class NotificationManager: ObservableObject {
         // Randomly select from enabled notification types
         let enabledTypesArray = Array(enabledTypes)
         guard !enabledTypesArray.isEmpty else { return nil }
-        
-        let selectedType = enabledTypesArray.randomElement()!
+
+        guard let selectedType = enabledTypesArray.randomElement() else {
+            return nil
+        }
         
         switch selectedType {
         case .currentlyReading:
@@ -153,7 +158,7 @@ class NotificationManager: ObservableObject {
                 "Feed your mind with some reading."
             ]
             content.title = "📚 Reading Time"
-            content.body = messages.randomElement()!
+            content.body = messages.randomElement() ?? "Time to read!"
         }
         
         content.sound = .default
