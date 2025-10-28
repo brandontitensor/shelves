@@ -4,6 +4,7 @@ import CoreData
 struct SettingsView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var userManager: UserManager
     @EnvironmentObject var developerSettings: DeveloperSettings
     @State private var exportFormat: ExportFormat = .csv
     @State private var showingLibraryManagement = false
@@ -66,12 +67,33 @@ struct SettingsView: View {
             iconColor: ShelvesDesign.Colors.antiqueGold
         ) {
             VStack(spacing: ShelvesDesign.Spacing.lg) {
+                // Bookplate Style selection
+                VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
+                    Text("Bookplate Style")
+                        .font(ShelvesDesign.Typography.headlineSmall)
+                        .foregroundColor(ShelvesDesign.Colors.text)
+
+                    VStack(spacing: ShelvesDesign.Spacing.sm) {
+                        ForEach(BookplateStyle.allCases, id: \.self) { style in
+                            BookplateStyleOption(
+                                style: style,
+                                isSelected: userManager.bookplateStyle == style
+                            ) {
+                                userManager.bookplateStyle = style
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+                    .background(ShelvesDesign.Colors.paleBeige)
+
                 // Theme selection
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
                     Text("Theme")
                         .font(ShelvesDesign.Typography.headlineSmall)
                         .foregroundColor(ShelvesDesign.Colors.text)
-                    
+
                     VStack(spacing: ShelvesDesign.Spacing.sm) {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
                             ThemeOption(
@@ -83,10 +105,10 @@ struct SettingsView: View {
                         }
                     }
                 }
-                
+
                 Divider()
                     .background(ShelvesDesign.Colors.paleBeige)
-                
+
                 // Notifications
                 SettingsButton(
                     title: "Reading Reminders",
@@ -202,7 +224,7 @@ struct SettingsView: View {
     
     private var aboutSection: some View {
         SettingsCard(
-            title: "About Shelves",
+            title: "About Libris.",
             subtitle: "App information and support",
             icon: "info.circle.fill",
             iconColor: ShelvesDesign.Colors.chestnut
@@ -246,7 +268,7 @@ struct SettingsView: View {
 
                 SettingsButton(
                     title: "Help & Support",
-                    subtitle: "Get help using Shelves",
+                    subtitle: "Get help using Libris.",
                     icon: "questionmark.circle"
                 ) {
                     openHelpAndSupport()
@@ -269,7 +291,7 @@ struct SettingsView: View {
                 }
 
                 SettingsButton(
-                    title: "Rate Shelves",
+                    title: "Rate Libris.",
                     subtitle: "Share your thoughts on the App Store",
                     icon: "star"
                 ) {
@@ -510,7 +532,7 @@ struct SettingsView: View {
     }
     
     private func openHelpAndSupport() {
-        if let url = URL(string: "mailto:support@titanlabstech.net?subject=Shelves%20Support") {
+        if let url = URL(string: "mailto:support@titanlabstech.net?subject=Libris%20Support") {
             UIApplication.shared.open(url)
         }
     }

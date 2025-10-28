@@ -8,23 +8,23 @@ struct OnboardingView: View {
     
     private let onboardingPages = [
         OnboardingPage(
-            title: "Welcome to Shelves",
-            subtitle: "Your personal library sanctuary",
-            description: "Organize, track, and discover your book collection with ease. From scan-to-add to reading progress, we've got you covered.",
+            title: "Welcome to Libris.",
+            subtitle: "Ex Libris — From Your Library",
+            description: "Create your personal digital bookplate and curate a collection that's uniquely yours. Organize, track, and cherish every book you own.",
             imageName: "books.vertical",
             primaryColor: Color(red: 0.79, green: 0.64, blue: 0.26)
         ),
         OnboardingPage(
-            title: "Smart Organization",
+            title: "Curate Your Collection",
             subtitle: "Libraries, rooms, and shelves",
-            description: "Create custom libraries for different locations. Sort by reading status, genre, or date added. Find any book instantly.",
+            description: "Organize books by location, reading status, or genre. Create custom libraries that reflect how you truly organize your personal collection.",
             imageName: "house.fill",
             primaryColor: Color(red: 0.57, green: 0.37, blue: 0.22)
         ),
         OnboardingPage(
-            title: "Track Your Reading",
-            subtitle: "Progress, notes, and ratings",
-            description: "Mark books as currently reading, add personal notes, rate your favorites, and see your reading progress over time.",
+            title: "Your Reading Journey",
+            subtitle: "Progress, notes, and memories",
+            description: "Add personal inscriptions and notes to each book. Track your reading journey and preserve the stories behind your collection.",
             imageName: "chart.line.uptrend.xyaxis",
             primaryColor: Color(red: 0.50, green: 0.11, blue: 0.10)
         ),
@@ -161,11 +161,11 @@ struct NameInputView: View {
                         .foregroundColor(Color(red: 0.79, green: 0.64, blue: 0.26))
                     
                     VStack(spacing: ShelvesDesign.Spacing.md) {
-                        Text("What should we call you?")
+                        Text("Create Your Bookplate")
                             .font(ShelvesDesign.Typography.titleMedium)
                             .foregroundColor(ShelvesDesign.Colors.warmBlack)
-                        
-                        Text("Personalize your library experience")
+
+                        Text("Ex libris — from the library of...")
                             .font(ShelvesDesign.Typography.bodyMedium)
                             .foregroundColor(ShelvesDesign.Colors.sepia)
                             .multilineTextAlignment(.center)
@@ -199,7 +199,7 @@ struct NameInputView: View {
                 Spacer()
             }
             .padding(ShelvesDesign.Spacing.xl)
-            .navigationTitle("Welcome!")
+            .navigationTitle("Your Bookplate")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {

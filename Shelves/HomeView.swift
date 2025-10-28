@@ -78,28 +78,28 @@ struct HomeView: View {
     }
     
     private var personalizedHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.xs) {
-                Text("\(userManager.displayName) Shelf")
-                    .font(ShelvesDesign.Typography.titleMedium)
-                    .foregroundColor(ShelvesDesign.Colors.text)
-                
-                if !currentlyReadingBooks.isEmpty {
-                    Text("Currently reading \(currentlyReadingBooks.count) book\(currentlyReadingBooks.count == 1 ? "" : "s")")
-                        .font(ShelvesDesign.Typography.bodyMedium)
-                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
-                } else if allBooks.isEmpty {
-                    Text("Ready to start your library journey")
-                        .font(ShelvesDesign.Typography.bodyMedium)
-                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
-                } else {
-                    Text("\(allBooks.count) books in your collection")
-                        .font(ShelvesDesign.Typography.bodyMedium)
-                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
-                }
+        VStack(spacing: ShelvesDesign.Spacing.md) {
+            // Bookplate
+            BookplateView(
+                userName: userManager.userName,
+                style: userManager.bookplateStyle,
+                showBorder: true
+            )
+
+            // Library status
+            if !currentlyReadingBooks.isEmpty {
+                Text("Currently reading \(currentlyReadingBooks.count) book\(currentlyReadingBooks.count == 1 ? "" : "s")")
+                    .font(ShelvesDesign.Typography.bodyMedium)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+            } else if allBooks.isEmpty {
+                Text("Ready to start your library journey")
+                    .font(ShelvesDesign.Typography.bodyMedium)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+            } else {
+                Text("\(allBooks.count) books in your collection")
+                    .font(ShelvesDesign.Typography.bodyMedium)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
             }
-            
-            Spacer()
         }
         .padding(.horizontal, ShelvesDesign.Spacing.lg)
     }
@@ -206,10 +206,10 @@ struct HomeView: View {
                     .foregroundColor(ShelvesDesign.Colors.chestnut.opacity(0.6))
                 
                 VStack(spacing: ShelvesDesign.Spacing.sm) {
-                    Text("Welcome to Shelves")
+                    Text("Welcome to Libris.")
                         .font(ShelvesDesign.Typography.titleMedium)
                         .foregroundColor(ShelvesDesign.Colors.text)
-                    
+
                     Text("Your personal library sanctuary")
                         .font(ShelvesDesign.Typography.bodyLarge)
                         .foregroundColor(ShelvesDesign.Colors.textSecondary)

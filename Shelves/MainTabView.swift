@@ -209,7 +209,10 @@ struct AddBookTabView: View {
         }
         .onChange(of: scannedCode) { _, isbn in
             if isbn != nil {
-                showingManualAdd = true
+                // Delay showing AddBook sheet to ensure scanner sheet is fully dismissed first
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showingManualAdd = true
+                }
             }
         }
     }
