@@ -38,7 +38,7 @@ struct ContentView: View {
         }
         #endif
         .sheet(isPresented: $showingAddBook) {
-            AddBookView(isbn: scannedCode)
+            AddBookView(isbn: scannedCode, prefillTitle: nil, prefillAuthor: nil)
         }
         .onChange(of: scannedCode) { _, isbn in
             if isbn != nil {
@@ -203,7 +203,7 @@ struct BookListSimpleView: View {
             }
         }
         .sheet(isPresented: $showingAddBook) {
-            AddBookView(isbn: nil)
+            AddBookView(isbn: nil, prefillTitle: nil, prefillAuthor: nil)
         }
     }
 }

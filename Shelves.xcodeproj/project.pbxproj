@@ -404,6 +404,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Libris. ";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Shelves uses the camera to scan book barcodes and capture book covers for your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shelves accesses your photo library to select book cover images for your library.";
 				INFOPLIST_KEY_NSUserNotificationsUsageDescription = "Shelves sends reading reminder notifications to help you maintain your reading habit.";
@@ -450,6 +451,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Libris. ";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Shelves uses the camera to scan book barcodes and capture book covers for your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shelves accesses your photo library to select book cover images for your library.";
 				INFOPLIST_KEY_NSUserNotificationsUsageDescription = "Shelves sends reading reminder notifications to help you maintain your reading habit.";

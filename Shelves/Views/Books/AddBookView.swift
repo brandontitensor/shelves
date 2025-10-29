@@ -6,7 +6,9 @@ struct AddBookView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var themeManager: ThemeManager
     let isbn: String?
-    
+    let prefillTitle: String?
+    let prefillAuthor: String?
+
     @State private var title = ""
     @State private var author = ""
     @State private var isbnText = ""
@@ -33,9 +35,17 @@ struct AddBookView: View {
     @State private var duplicateBooks: [Book] = []
     @State private var coverImageURL: String?
     @State private var showingCoverOptions = false
-    @State private var selectedCoverImage: UIImage?
-    
+
+    // Search section state
+    @State private var searchTitle = ""
+    @State private var searchAuthor = ""
+    @State private var searchISBN = ""
+    @State private var isSearching = false
+    @State private var searchResults: [BookSearchResult] = []
+    @State private var showingSearchResults = false
+
     #if canImport(UIKit)
+    @State private var selectedCoverImage: UIImage?
     @State private var showingImagePicker = false
     @State private var showingPhotoLibrary = false
     @State private var capturedImage: UIImage?
@@ -63,6 +73,8 @@ struct AddBookView: View {
     var body: some View {
         NavigationStack {
             Form {
+                searchSection
+                orDividerSection
                 basicInfoSection
                 additionalDetailsSection
                 readingStatusSection
@@ -86,9 +98,21 @@ struct AddBookView: View {
                 }
             }
             .onAppear {
+                // Handle prefilled data from cover scan
+                if let prefillTitle = prefillTitle {
+                    self.title = prefillTitle
+                }
+                if let prefillAuthor = prefillAuthor {
+                    self.author = prefillAuthor
+                }
+
+                // Handle ISBN prefill
                 if let prefilledISBN = isbn {
                     self.isbnText = prefilledISBN
-                    fetchBookData(isbn: prefilledISBN)
+                    // Only fetch if we don't already have title/author from cover scan
+                    if prefillTitle == nil && prefillAuthor == nil {
+                        fetchBookData(isbn: prefilledISBN)
+                    }
                 }
             }
             #if canImport(UIKit)
@@ -150,22 +174,104 @@ struct AddBookView: View {
             } message: {
                 Text("Enter the name for your new library.")
             }
-        }
-    }
-    
-    private var basicInfoSection: some View {
-        Section("Book Information") {
-            TextField("ISBN (enter to auto-fill)", text: $isbnText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.numberPad)
-                .onSubmit {
-                    if !isbnText.isEmpty && isValidISBN(isbnText) {
-                        fetchBookData(isbn: isbnText)
-                    } else if !isbnText.isEmpty {
-                        errorMessage = "Invalid ISBN format. ISBN should be 10 or 13 digits."
+            .sheet(isPresented: $showingSearchResults) {
+                if !searchResults.isEmpty {
+                    BookSearchResultsView(searchResults: searchResults) { selectedBook in
+                        fillFromSearchResult(selectedBook)
+                        showingSearchResults = false
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Search Section
+
+    private var searchSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Search for Your Book")
+                    .font(.headline)
+                    .foregroundColor(ShelvesDesign.Colors.text)
+
+                Text("Enter title, author, or ISBN to search online")
+                    .font(.caption)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+
+                VStack(spacing: 0) {
+                    TextField("Title", text: $searchTitle)
+                        .textInputAutocapitalization(.words)
+                        .padding(.vertical, 8)
+
+                    Divider()
+
+                    TextField("Author", text: $searchAuthor)
+                        .textInputAutocapitalization(.words)
+                        .padding(.vertical, 8)
+
+                    Divider()
+
+                    TextField("ISBN", text: $searchISBN)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.numbersAndPunctuation)
+                        .padding(.vertical, 8)
+                }
+                .padding(.vertical, 4)
+
+                Button(action: performSearch) {
+                    HStack {
+                        if isSearching {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                        }
+                        Text(isSearching ? "Searching..." : "Search")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(searchButtonEnabled ? ShelvesDesign.Colors.primary : ShelvesDesign.Colors.textSecondary.opacity(0.3))
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .disabled(!searchButtonEnabled || isSearching)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var searchButtonEnabled: Bool {
+        !searchTitle.isEmpty || !searchAuthor.isEmpty || !searchISBN.isEmpty
+    }
+
+    private var orDividerSection: some View {
+        Section {
+            HStack {
+                Rectangle()
+                    .fill(ShelvesDesign.Colors.textSecondary.opacity(0.3))
+                    .frame(height: 1)
+
+                Text("OR")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                    .padding(.horizontal, 12)
+
+                Rectangle()
+                    .fill(ShelvesDesign.Colors.textSecondary.opacity(0.3))
+                    .frame(height: 1)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var basicInfoSection: some View {
+        Section("Manual Entry") {
+            TextField("ISBN (optional)", text: $isbnText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.numbersAndPunctuation)
 
             if !errorMessage.isEmpty {
                 Text(errorMessage)
@@ -194,39 +300,9 @@ struct AddBookView: View {
                     .buttonStyle(.bordered)
                     
                     Spacer()
-                    
+
                     // Cover preview
-                    if let selectedImage = selectedCoverImage {
-                        Image(uiImage: selectedImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 50, height: 70)
-                            .cornerRadius(8)
-                    } else if let urlString = coverImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay(
-                                    Image(systemName: "book.closed")
-                                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
-                                )
-                        }
-                        .frame(width: 50, height: 70)
-                        .cornerRadius(8)
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .overlay(
-                                Image(systemName: "book.closed")
-                                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
-                            )
-                            .frame(width: 50, height: 70)
-                            .cornerRadius(8)
-                    }
+                    coverPreviewImage
                 }
             }
             
@@ -377,7 +453,143 @@ struct AddBookView: View {
             }
         }
     }
-    
+
+    private func performSearch() {
+        isSearching = true
+        errorMessage = ""
+
+        Task {
+            do {
+                var results: [BookSearchResult] = []
+
+                // Try ISBN search first if provided
+                if !searchISBN.isEmpty && isValidISBN(searchISBN) {
+                    let bookData = try await OpenLibraryService.shared.fetchBookData(isbn: searchISBN)
+                    let result = BookSearchResult(
+                        title: bookData.title,
+                        author: bookData.author,
+                        isbn: searchISBN,
+                        coverURL: bookData.coverImageURL,
+                        publishYear: bookData.publishedDate,
+                        matchScore: 1.0
+                    )
+                    results = [result]
+                } else if !searchTitle.isEmpty {
+                    // Search by title and/or author (title is required)
+                    results = try await OpenLibraryService.shared.searchByTitleAuthor(
+                        title: searchTitle,
+                        author: searchAuthor.isEmpty ? nil : searchAuthor
+                    )
+                } else if !searchAuthor.isEmpty {
+                    // If only author is provided, search with author as title
+                    results = try await OpenLibraryService.shared.searchByTitleAuthor(
+                        title: searchAuthor,
+                        author: nil
+                    )
+                }
+
+                await MainActor.run {
+                    searchResults = results
+                    isSearching = false
+
+                    if results.isEmpty {
+                        errorMessage = "No results found. Try adjusting your search or add the book manually below."
+                    } else {
+                        showingSearchResults = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Search failed: \(error.localizedDescription)"
+                    isSearching = false
+                }
+            }
+        }
+    }
+
+    private func fillFromSearchResult(_ result: BookSearchResult) {
+        // Fill basic info from search result
+        title = result.title
+        author = result.author
+        isbnText = result.isbn ?? ""
+        publishedDate = result.publishYear ?? ""
+        coverImageURL = result.coverURL
+
+        // If we have an ISBN, fetch full details
+        if let isbn = result.isbn, !isbn.isEmpty {
+            fetchBookData(isbn: isbn)
+        }
+
+        // Clear search fields
+        searchTitle = ""
+        searchAuthor = ""
+        searchISBN = ""
+        searchResults = []
+    }
+
+    @ViewBuilder
+    private var coverPreviewImage: some View {
+        #if canImport(UIKit)
+        if let selectedImage = selectedCoverImage {
+            Image(uiImage: selectedImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 50, height: 70)
+                .cornerRadius(8)
+        } else if let urlString = coverImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        Image(systemName: "book.closed")
+                            .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                    )
+            }
+            .frame(width: 50, height: 70)
+            .cornerRadius(8)
+        } else {
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .overlay(
+                    Image(systemName: "book.closed")
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                )
+                .frame(width: 50, height: 70)
+                .cornerRadius(8)
+        }
+        #else
+        if let urlString = coverImageURL, !urlString.isEmpty, let url = URL(string: urlString) {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        Image(systemName: "book.closed")
+                            .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                    )
+            }
+            .frame(width: 50, height: 70)
+            .cornerRadius(8)
+        } else {
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .overlay(
+                    Image(systemName: "book.closed")
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+                )
+                .frame(width: 50, height: 70)
+                .cornerRadius(8)
+        }
+        #endif
+    }
+
     private func saveBook() {
         // Check for duplicates first
         checkForDuplicates { shouldProceed in
@@ -446,8 +658,9 @@ struct AddBookView: View {
         newBook.dateRead = isRead ? Date() : nil
         newBook.libraryName = libraryName.isEmpty ? "Home Library" : libraryName
         newBook.isbn = isbnText.isEmpty ? nil : isbnText
-        
+
         // Handle cover image
+        #if canImport(UIKit)
         if let selectedImage = selectedCoverImage {
             // Save custom image to documents directory
             if let imageURL = saveImageToDocuments(selectedImage) {
@@ -456,6 +669,9 @@ struct AddBookView: View {
         } else {
             newBook.coverImageURL = coverImageURL
         }
+        #else
+        newBook.coverImageURL = coverImageURL
+        #endif
         
         do {
             try viewContext.save()
@@ -468,7 +684,8 @@ struct AddBookView: View {
             errorMessage = "Failed to save book: \(error.localizedDescription)"
         }
     }
-    
+
+    #if canImport(UIKit)
     private func saveImageToDocuments(_ image: UIImage) -> URL? {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return nil }
 
@@ -486,6 +703,7 @@ struct AddBookView: View {
             return nil
         }
     }
+    #endif
 }
 
 struct StarRatingView: View {
@@ -508,6 +726,6 @@ struct StarRatingView: View {
 }
 
 #Preview {
-    AddBookView(isbn: nil)
+    AddBookView(isbn: nil, prefillTitle: nil, prefillAuthor: nil)
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

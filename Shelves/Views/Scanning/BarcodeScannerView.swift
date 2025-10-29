@@ -16,7 +16,9 @@ struct BarcodeScannerView: View {
     @State private var scannerMode: ScannerMode = .barcode
     @State private var isLoading = false
     @State private var detectedISBN: String?
-    
+    @AppStorage("hasSeenBarcodeScannerTutorial") private var hasSeenTutorial = false
+    @State private var showingTutorial = false
+
     var body: some View {
         ZStack {
             if permissionDenied {
@@ -24,8 +26,8 @@ struct BarcodeScannerView: View {
             } else {
                 scannerView
 
-                // Only show overlay UI when not loading
-                if !isLoading {
+                // Only show overlay UI when not loading or showing tutorial
+                if !isLoading && !showingTutorial {
                     overlayUI
                 }
 
@@ -35,11 +37,24 @@ struct BarcodeScannerView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isLoading)
                 }
+
+                // Tutorial overlay
+                if showingTutorial {
+                    tutorialOverlay
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingTutorial)
+                }
             }
         }
         .background(Color.black)
         .onAppear {
             checkCameraPermission()
+            // Show tutorial automatically on first use
+            if !hasSeenTutorial && !permissionDenied {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showingTutorial = true
+                }
+            }
         }
         .alert("Camera Access Required", isPresented: $showingPermissionAlert) {
             Button("Settings") {
@@ -139,7 +154,21 @@ struct BarcodeScannerView: View {
     private var topBar: some View {
         VStack(spacing: 12) {
             HStack {
+                // Help button on the left
+                Button(action: {
+                    showingTutorial = true
+                }) {
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+                .padding()
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(8)
+
                 Spacer()
+
+                // Cancel button on the right
                 Button("Cancel") {
                     isPresented = false
                 }
@@ -225,7 +254,80 @@ struct BarcodeScannerView: View {
             ? "Point your camera at the barcode on the back of your book"
             : "Point your camera at the ISBN text (usually found above or below the barcode)"
     }
-    
+
+    private var tutorialOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.95)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Header
+                    VStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.green.opacity(0.2))
+                                .frame(width: 100, height: 100)
+
+                            Image(systemName: "barcode.viewfinder")
+                                .font(.system(size: 50))
+                                .foregroundColor(.green)
+                        }
+
+                        Text("How to Scan")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+
+                        Text("Follow these tips for the best results")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    // Instructions
+                    VStack(alignment: .leading, spacing: 24) {
+                        TutorialStep(
+                            icon: "barcode",
+                            title: "Scan Barcode Mode",
+                            description: "Point your camera at the ISBN barcode on the back of the book. The barcode will be detected automatically."
+                        )
+
+                        TutorialStep(
+                            icon: "text.viewfinder",
+                            title: "ISBN Text Mode",
+                            description: "Switch to ISBN Text mode to scan the ISBN numbers printed above or below the barcode. Tap to focus if needed."
+                        )
+
+                        TutorialStep(
+                            icon: "lightbulb.fill",
+                            title: "Best Results",
+                            description: "Use good lighting, hold the camera steady, and position the barcode within the frame. The scan happens automatically!"
+                        )
+                    }
+                    .padding(.horizontal)
+
+                    // Got It button
+                    Button(action: {
+                        showingTutorial = false
+                        hasSeenTutorial = true
+                    }) {
+                        Text("Got It!")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 8)
+                }
+                .padding(.vertical, 40)
+            }
+        }
+    }
+
     private var permissionDeniedView: some View {
         VStack(spacing: 20) {
             Image(systemName: "camera.fill")
@@ -542,4 +644,33 @@ extension BarcodeScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         }
     }
 }
+
+// MARK: - Tutorial Step Helper
+
+struct TutorialStep: View {
+    let icon: String
+    let title: String
+    let description: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(.green)
+                .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.white)
+
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
 #endif

@@ -25,11 +25,11 @@ struct EditBookView: View {
     @State private var format = "Physical"
     @State private var showingSaveConfirmation = false
     @State private var showingCoverOptions = false
-    @State private var selectedCoverImage: UIImage?
     @State private var showingCustomLibraryInput = false
     @State private var customLibraryName = ""
-    
+
     #if canImport(UIKit)
+    @State private var selectedCoverImage: UIImage?
     @State private var showingImagePicker = false
     @State private var showingPhotoLibrary = false
     #endif
@@ -159,39 +159,9 @@ struct EditBookView: View {
                     .buttonStyle(.bordered)
                     
                     Spacer()
-                    
+
                     // Cover preview
-                    if let selectedImage = selectedCoverImage {
-                        Image(uiImage: selectedImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 50, height: 70)
-                            .cornerRadius(8)
-                    } else if !coverImageURL.isEmpty, let url = URL(string: coverImageURL) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .overlay(
-                                    Image(systemName: "book.closed")
-                                        .foregroundColor(.gray)
-                                )
-                        }
-                        .frame(width: 50, height: 70)
-                        .cornerRadius(8)
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .overlay(
-                                Image(systemName: "book.closed")
-                                    .foregroundColor(.gray)
-                            )
-                            .frame(width: 50, height: 70)
-                            .cornerRadius(8)
-                    }
+                    coverPreviewImage
                 }
             }
             
@@ -322,7 +292,70 @@ struct EditBookView: View {
         currentlyReading = book.currentlyReading
         isOwned = book.isOwned
     }
-    
+
+    @ViewBuilder
+    private var coverPreviewImage: some View {
+        #if canImport(UIKit)
+        if let selectedImage = selectedCoverImage {
+            Image(uiImage: selectedImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 50, height: 70)
+                .cornerRadius(8)
+        } else if !coverImageURL.isEmpty, let url = URL(string: coverImageURL) {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        Image(systemName: "book.closed")
+                            .foregroundColor(.gray)
+                    )
+            }
+            .frame(width: 50, height: 70)
+            .cornerRadius(8)
+        } else {
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .overlay(
+                    Image(systemName: "book.closed")
+                        .foregroundColor(.gray)
+                )
+                .frame(width: 50, height: 70)
+                .cornerRadius(8)
+        }
+        #else
+        if !coverImageURL.isEmpty, let url = URL(string: coverImageURL) {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        Image(systemName: "book.closed")
+                            .foregroundColor(.gray)
+                    )
+            }
+            .frame(width: 50, height: 70)
+            .cornerRadius(8)
+        } else {
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .overlay(
+                    Image(systemName: "book.closed")
+                        .foregroundColor(.gray)
+                )
+                .frame(width: 50, height: 70)
+                .cornerRadius(8)
+        }
+        #endif
+    }
+
     private func saveChanges() {
         book.title = title.isEmpty ? "Unknown Title" : title
         book.author = author.isEmpty ? nil : author
@@ -346,8 +379,9 @@ struct EditBookView: View {
         } else if !isRead {
             book.dateRead = nil
         }
-        
+
         // Handle custom cover image
+        #if canImport(UIKit)
         if let selectedImage = selectedCoverImage {
             // Delete old image if it exists and is a local file
             if let oldURLString = book.coverImageURL,
@@ -363,6 +397,11 @@ struct EditBookView: View {
         } else if !coverImageURL.isEmpty {
             book.coverImageURL = coverImageURL
         }
+        #else
+        if !coverImageURL.isEmpty {
+            book.coverImageURL = coverImageURL
+        }
+        #endif
         
         do {
             try viewContext.save()
@@ -375,7 +414,8 @@ struct EditBookView: View {
             // Failed to save changes - could add user-facing error alert here
         }
     }
-    
+
+    #if canImport(UIKit)
     private func saveImageToDocuments(_ image: UIImage) -> URL? {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return nil }
 
@@ -393,4 +433,5 @@ struct EditBookView: View {
             return nil
         }
     }
+    #endif
 }

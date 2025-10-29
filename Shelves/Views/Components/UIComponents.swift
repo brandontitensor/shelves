@@ -109,7 +109,7 @@ struct CurrentlyReadingCard: View {
                 Spacer()
                 
                 HStack {
-                    Image(systemName: "book.open")
+                    Image(systemName: "book.closed.fill")
                         .foregroundColor(.blue)
                     Text("Continue Reading")
                         .font(.subheadline)

@@ -26,6 +26,8 @@ struct LibraryView: View {
     @State private var showingFilters = false
     @State private var selectedSmartCollection: String? = nil
     @State private var selectedCustomLibrary: String? = nil
+    @State private var showingSearch = false
+    @State private var showingSettings = false
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.dateAdded, ascending: false)],
@@ -275,12 +277,26 @@ struct LibraryView: View {
                 .navigationTitle("Library")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            showingSettings = true
+                        }) {
+                            Image(systemName: "gearshape.fill")
+                                .foregroundColor(ShelvesDesign.Colors.primary)
+                        }
+                    }
+
                     ToolbarItem(placement: .navigationBarTrailing) {
                         viewModeToggle
                     }
                 }
         }
-        .searchable(text: $searchText, prompt: "Search your library...")
+        .sheet(isPresented: $showingSearch) {
+            SearchView()
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
         .environmentObject(libraryEnvironment)
         .onChange(of: sortOption) { _, newValue in
             libraryEnvironment.currentSortOption = newValue
@@ -294,7 +310,28 @@ struct LibraryView: View {
     private var mainLibraryView: some View {
         ScrollView {
             VStack(spacing: ShelvesDesign.Spacing.lg) {
-                
+
+                // Search Button
+                Button(action: {
+                    showingSearch = true
+                }) {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(ShelvesDesign.Colors.textSecondary)
+
+                        Text("Search your library...")
+                            .foregroundColor(ShelvesDesign.Colors.textSecondary)
+
+                        Spacer()
+                    }
+                    .padding()
+                    .background(ShelvesDesign.Colors.surface)
+                    .cornerRadius(10)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal, ShelvesDesign.Spacing.md)
+                .padding(.top, ShelvesDesign.Spacing.sm)
+
                 // Smart Collections Section
                 VStack(alignment: .leading, spacing: ShelvesDesign.Spacing.md) {
                     HStack {
@@ -402,7 +439,28 @@ struct LibraryView: View {
                 }
             }
             .padding(ShelvesDesign.Spacing.md)
-            
+
+            // Search Button
+            Button(action: {
+                showingSearch = true
+            }) {
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+
+                    Text("Search your library...")
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary)
+
+                    Spacer()
+                }
+                .padding()
+                .background(ShelvesDesign.Colors.surface)
+                .cornerRadius(10)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.horizontal, ShelvesDesign.Spacing.md)
+            .padding(.bottom, ShelvesDesign.Spacing.sm)
+
             // Sort options
             HStack {
                 Menu {

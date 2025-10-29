@@ -260,7 +260,7 @@ struct SearchView: View {
                 QuickAccessCard(
                     title: "Currently Reading",
                     count: allBooks.filter { $0.currentlyReading }.count,
-                    icon: "book.open",
+                    icon: "book.closed.fill",
                     color: ShelvesDesign.Colors.forestGreen
                 ) {
                     searchCategory = .all
