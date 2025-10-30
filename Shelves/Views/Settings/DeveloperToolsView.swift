@@ -10,6 +10,7 @@ import SwiftUI
 struct DeveloperToolsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var developerSettings: DeveloperSettings
+    @EnvironmentObject var themeManager: ThemeManager
 
     var body: some View {
         NavigationStack {

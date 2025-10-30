@@ -3,10 +3,11 @@ import CoreData
 
 struct EditBookView: View {
     let book: Book
+    var onDelete: (() -> Void)? = nil
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var themeManager: ThemeManager
-    
+
     @State private var title = ""
     @State private var author = ""
     @State private var publishedDate = ""
@@ -15,7 +16,7 @@ struct EditBookView: View {
     @State private var coverImageURL = ""
     @State private var summary = ""
     @State private var personalNotes = ""
-    @State private var bookSize = ""
+    @State private var bindingType = ""
     @State private var rating: Float = 0
     @State private var isRead = false
     @State private var isWantToRead = false
@@ -27,6 +28,7 @@ struct EditBookView: View {
     @State private var showingCoverOptions = false
     @State private var showingCustomLibraryInput = false
     @State private var customLibraryName = ""
+    @State private var showingDeleteConfirmation = false
 
     #if canImport(UIKit)
     @State private var selectedCoverImage: UIImage?
@@ -34,7 +36,7 @@ struct EditBookView: View {
     @State private var showingPhotoLibrary = false
     #endif
     
-    let bookSizes = ["Pocket", "Mass Market", "Trade Paperback", "Hardcover", "Large Print", "Unknown"]
+    let bindingTypes = ["Hardcover", "Paperback", "Mass Market Paperback", "Oversized"]
     let bookFormats = ["Physical", "Ebook", "Audiobook"]
 
     private var predefinedLibraries: [String] {
@@ -60,6 +62,7 @@ struct EditBookView: View {
                 readingStatusSection
                 additionalDetailsSection
                 personalSection
+                deleteSection
             }
             .navigationTitle("Edit Book")
             .navigationBarTitleDisplayMode(.inline)
@@ -118,6 +121,14 @@ struct EditBookView: View {
                 }
             } message: {
                 Text("Enter the name for your new library.")
+            }
+            .alert("Delete Book", isPresented: $showingDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    deleteBook()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Are you sure you want to delete \"\(title)\"? This action cannot be undone.")
             }
         }
     }
@@ -238,13 +249,24 @@ struct EditBookView: View {
     
     private var additionalDetailsSection: some View {
         Section("Additional Details") {
-            Picker("Book Size", selection: $bookSize) {
-                ForEach(bookSizes, id: \.self) { size in
-                    Text(size).tag(size)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Binding Type")
+                    .font(.subheadline)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(bindingTypes, id: \.self) { type in
+                        BindingTypeOption(
+                            type: type,
+                            isSelected: bindingType == type
+                        ) {
+                            bindingType = type
+                        }
+                    }
                 }
             }
-            .pickerStyle(MenuPickerStyle())
-            
+            .padding(.vertical, 8)
+
             HStack {
                 Text("Library:")
                 Spacer()
@@ -273,7 +295,21 @@ struct EditBookView: View {
                 .lineLimit(4...8)
         }
     }
-    
+
+    private var deleteSection: some View {
+        Section {
+            Button(role: .destructive) {
+                showingDeleteConfirmation = true
+            } label: {
+                HStack {
+                    Spacer()
+                    Label("Delete Book", systemImage: "trash")
+                    Spacer()
+                }
+            }
+        }
+    }
+
     private func loadBookData() {
         title = book.title ?? ""
         author = book.author ?? ""
@@ -283,7 +319,7 @@ struct EditBookView: View {
         coverImageURL = book.coverImageURL ?? ""
         summary = book.summary ?? ""
         personalNotes = book.personalNotes ?? ""
-        bookSize = book.size ?? "Unknown"
+        bindingType = book.size ?? "Paperback"
         format = book.format ?? "Physical"
         rating = book.rating
         isRead = book.isRead
@@ -364,7 +400,7 @@ struct EditBookView: View {
         book.genre = genre.isEmpty ? nil : genre
         book.summary = summary.isEmpty ? nil : summary
         book.personalNotes = personalNotes.isEmpty ? nil : personalNotes
-        book.size = bookSize == "Unknown" ? nil : bookSize
+        book.size = bindingType
         book.format = format
         book.rating = rating
         book.isRead = isRead
@@ -412,6 +448,29 @@ struct EditBookView: View {
             }
         } catch {
             // Failed to save changes - could add user-facing error alert here
+        }
+    }
+
+    private func deleteBook() {
+        // Delete associated cover image if it's a local file
+        #if canImport(UIKit)
+        if let coverURLString = book.coverImageURL,
+           let coverURL = URL(string: coverURLString),
+           coverURL.isFileURL {
+            try? FileManager.default.removeItem(at: coverURL)
+        }
+        #endif
+
+        // Delete the book from Core Data
+        viewContext.delete(book)
+
+        do {
+            try viewContext.save()
+            // Notify parent view that book was deleted
+            onDelete?()
+            dismiss()
+        } catch {
+            // Failed to delete - could add user-facing error alert here
         }
     }
 

@@ -93,39 +93,56 @@ struct MainTabView: View {
             // Force immediate update of all existing UI elements
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
                 for window in windowScene.windows {
-                    for view in window.subviews {
-                        view.setNeedsDisplay()
-                    }
-                    // Force navigation bars to update
-                    window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
-                    if let navController = window.rootViewController as? UINavigationController {
-                        navController.navigationBar.setNeedsLayout()
-                        navController.navigationBar.layoutIfNeeded()
-                    }
-                    // Recursively update all navigation controllers
-                    updateNavigationBarsRecursively(viewController: window.rootViewController)
+                    // Recursively find and update all navigation bars
+                    updateNavigationBarsRecursively(viewController: window.rootViewController, appearance: navBarAppearance)
+
+                    // Also search the entire view hierarchy for navigation bars
+                    updateNavigationBarsInViewHierarchy(view: window, appearance: navBarAppearance)
                 }
             }
         }
     }
 
-    private func updateNavigationBarsRecursively(viewController: UIViewController?) {
+    private func updateNavigationBarsRecursively(viewController: UIViewController?, appearance: UINavigationBarAppearance) {
         guard let viewController = viewController else { return }
 
         if let navigationController = viewController as? UINavigationController {
+            // Directly set the appearance on this navigation bar
+            navigationController.navigationBar.standardAppearance = appearance
+            navigationController.navigationBar.scrollEdgeAppearance = appearance
+            navigationController.navigationBar.compactAppearance = appearance
+
+            // Force immediate layout update
             navigationController.navigationBar.setNeedsLayout()
             navigationController.navigationBar.layoutIfNeeded()
+
             for childVC in navigationController.viewControllers {
-                updateNavigationBarsRecursively(viewController: childVC)
+                updateNavigationBarsRecursively(viewController: childVC, appearance: appearance)
             }
         } else if let tabBarController = viewController as? UITabBarController {
             for childVC in tabBarController.viewControllers ?? [] {
-                updateNavigationBarsRecursively(viewController: childVC)
+                updateNavigationBarsRecursively(viewController: childVC, appearance: appearance)
             }
         }
 
         for childVC in viewController.children {
-            updateNavigationBarsRecursively(viewController: childVC)
+            updateNavigationBarsRecursively(viewController: childVC, appearance: appearance)
+        }
+    }
+
+    private func updateNavigationBarsInViewHierarchy(view: UIView, appearance: UINavigationBarAppearance) {
+        // Check if this view is a navigation bar
+        if let navigationBar = view as? UINavigationBar {
+            navigationBar.standardAppearance = appearance
+            navigationBar.scrollEdgeAppearance = appearance
+            navigationBar.compactAppearance = appearance
+            navigationBar.setNeedsLayout()
+            navigationBar.layoutIfNeeded()
+        }
+
+        // Recursively check all subviews
+        for subview in view.subviews {
+            updateNavigationBarsInViewHierarchy(view: subview, appearance: appearance)
         }
     }
     #endif

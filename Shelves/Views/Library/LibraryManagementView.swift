@@ -4,7 +4,8 @@ import CoreData
 struct LibraryManagementView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
-    
+    @EnvironmentObject var themeManager: ThemeManager
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.libraryName, ascending: true)],
         animation: .default)

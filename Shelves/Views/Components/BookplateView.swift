@@ -20,6 +20,7 @@ enum BookplateStyle: String, CaseIterable {
 
 // MARK: - Bookplate View
 struct BookplateView: View {
+    @EnvironmentObject var themeManager: ThemeManager
     let userName: String
     let style: BookplateStyle
     let showBorder: Bool
@@ -194,6 +195,7 @@ struct BookplateView: View {
 
 // MARK: - Bookplate Style Selector (for Settings)
 struct BookplateStyleOption: View {
+    @EnvironmentObject var themeManager: ThemeManager
     let style: BookplateStyle
     let isSelected: Bool
     let action: () -> Void

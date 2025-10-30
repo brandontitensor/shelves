@@ -4,7 +4,8 @@ import CoreData
 struct DuplicateDetectionView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
-    
+    @EnvironmentObject var themeManager: ThemeManager
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Book.title, ascending: true)],
         animation: .default)

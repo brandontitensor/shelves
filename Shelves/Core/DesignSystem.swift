@@ -43,24 +43,25 @@ struct ShelvesDesign {
     
     // MARK: - Typography
     struct Typography {
-        // Primary serif fonts
-        static let titleLarge = Font.custom("Georgia", size: 32).weight(.medium)
-        static let titleMedium = Font.custom("Georgia", size: 24).weight(.medium)
-        static let titleSmall = Font.custom("Georgia", size: 20).weight(.medium)
-        
-        static let headlineLarge = Font.custom("Baskerville", size: 22).weight(.semibold)
-        static let headlineMedium = Font.custom("Baskerville", size: 18).weight(.semibold)
-        static let headlineSmall = Font.custom("Baskerville", size: 16).weight(.semibold)
-        
-        // Secondary sans-serif fonts
+        // New York serif font for titles and headlines
+        // Using .design: .serif provides Apple's premium New York font
+        static let titleLarge = Font.system(size: 32, weight: .semibold, design: .serif)
+        static let titleMedium = Font.system(size: 24, weight: .semibold, design: .serif)
+        static let titleSmall = Font.system(size: 20, weight: .medium, design: .serif)
+
+        static let headlineLarge = Font.system(size: 22, weight: .semibold, design: .serif)
+        static let headlineMedium = Font.system(size: 18, weight: .semibold, design: .serif)
+        static let headlineSmall = Font.system(size: 16, weight: .semibold, design: .serif)
+
+        // SF Pro sans-serif fonts for body text and labels
         static let bodyLarge = Font.system(size: 17, weight: .regular, design: .default)
         static let bodyMedium = Font.system(size: 15, weight: .regular, design: .default)
         static let bodySmall = Font.system(size: 13, weight: .regular, design: .default)
-        
+
         static let labelLarge = Font.system(size: 16, weight: .medium, design: .default)
         static let labelMedium = Font.system(size: 14, weight: .medium, design: .default)
         static let labelSmall = Font.system(size: 12, weight: .medium, design: .default)
-        
+
         static let caption = Font.system(size: 11, weight: .regular, design: .default)
     }
     

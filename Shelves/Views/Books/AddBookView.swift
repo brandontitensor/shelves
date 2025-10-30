@@ -23,7 +23,7 @@ struct AddBookView: View {
     @State private var currentlyReading = false
     @State private var isOwned = true
     @State private var rating: Float = 0
-    @State private var bookSize = "Unknown"
+    @State private var bindingType = "Paperback"
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var libraryName = "Home Library"
@@ -51,7 +51,7 @@ struct AddBookView: View {
     @State private var capturedImage: UIImage?
     #endif
     
-    private let bookSizes = ["Pocket", "Mass Market", "Trade Paperback", "Hardcover", "Large Print", "Unknown"]
+    private let bindingTypes = ["Hardcover", "Paperback", "Mass Market Paperback", "Oversized"]
     private let bookFormats = ["Physical", "Ebook", "Audiobook"]
 
     private var predefinedLibraries: [String] {
@@ -121,11 +121,6 @@ struct AddBookView: View {
             }
             .sheet(isPresented: $showingPhotoLibrary) {
                 ImagePicker(image: $selectedCoverImage, isPresented: $showingPhotoLibrary, sourceType: .photoLibrary)
-            }
-            .onChange(of: capturedImage) { _, image in
-                if let image = image {
-                    bookSize = BookSizeEstimator.estimateSize(from: image)
-                }
             }
             #endif
             .alert("Book Saved Successfully!", isPresented: $showingSaveConfirmation) {
@@ -322,25 +317,24 @@ struct AddBookView: View {
     
     private var additionalDetailsSection: some View {
         Section("Additional Details") {
-            HStack {
-                Picker("Book Size", selection: $bookSize) {
-                    ForEach(bookSizes, id: \.self) { size in
-                        Text(size).tag(size)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Binding Type")
+                    .font(.subheadline)
+                    .foregroundColor(ShelvesDesign.Colors.textSecondary)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(bindingTypes, id: \.self) { type in
+                        BindingTypeOption(
+                            type: type,
+                            isSelected: bindingType == type
+                        ) {
+                            bindingType = type
+                        }
                     }
                 }
-                .pickerStyle(MenuPickerStyle())
-                
-                Spacer()
-                
-                #if canImport(UIKit)
-                Button("📷 Estimate") {
-                    showingImagePicker = true
-                }
-                .font(.caption)
-                .foregroundColor(ShelvesDesign.Colors.primary)
-                #endif
             }
-            
+            .padding(.vertical, 8)
+
             HStack {
                 Text("Library:")
                 Spacer()
@@ -652,7 +646,7 @@ struct AddBookView: View {
         newBook.currentlyReading = currentlyReading
         newBook.isOwned = isOwned
         newBook.rating = isRead ? rating : 0
-        newBook.size = bookSize
+        newBook.size = bindingType
         newBook.format = format
         newBook.dateAdded = Date()
         newBook.dateRead = isRead ? Date() : nil
@@ -708,7 +702,7 @@ struct AddBookView: View {
 
 struct StarRatingView: View {
     @Binding var rating: Float
-    
+
     var body: some View {
         HStack(spacing: 4) {
             ForEach(1...5, id: \.self) { index in
@@ -722,6 +716,76 @@ struct StarRatingView: View {
                 .buttonStyle(PlainButtonStyle())
             }
         }
+    }
+}
+
+struct BindingTypeOption: View {
+    let type: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    private var iconName: String {
+        switch type {
+        case "Hardcover":
+            return "book.closed.fill"
+        case "Paperback":
+            return "book.closed"
+        case "Mass Market Paperback":
+            return "book.fill"
+        case "Oversized":
+            return "text.book.closed.fill"
+        default:
+            return "book"
+        }
+    }
+
+    private var description: String {
+        switch type {
+        case "Hardcover":
+            return "Rigid cover"
+        case "Paperback":
+            return "Flexible cover"
+        case "Mass Market Paperback":
+            return "Small pocket size"
+        case "Oversized":
+            return "Large format"
+        default:
+            return ""
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: iconName)
+                    .font(.system(size: 32))
+                    .foregroundColor(isSelected ? ShelvesDesign.Colors.primary : ShelvesDesign.Colors.textSecondary)
+
+                VStack(spacing: 2) {
+                    Text(type)
+                        .font(.caption)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundColor(isSelected ? ShelvesDesign.Colors.text : ShelvesDesign.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+
+                    Text(description)
+                        .font(.caption2)
+                        .foregroundColor(ShelvesDesign.Colors.textSecondary.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? ShelvesDesign.Colors.primary.opacity(0.1) : Color(.systemGray6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(isSelected ? ShelvesDesign.Colors.primary : Color.clear, lineWidth: 2)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

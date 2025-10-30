@@ -4,9 +4,10 @@ import CoreData
 struct BookDetailView: View {
     let book: Book
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var themeManager: ThemeManager
     @State private var showingEditView = false
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -30,7 +31,9 @@ struct BookDetailView: View {
             }
         }
         .sheet(isPresented: $showingEditView) {
-            EditBookView(book: book)
+            EditBookView(book: book, onDelete: {
+                dismiss()
+            })
         }
     }
     
@@ -135,7 +138,7 @@ struct BookDetailView: View {
                 }
                 
                 if let size = book.size {
-                    InfoRow(label: "Size", value: size)
+                    InfoRow(label: "Binding", value: size)
                 }
                 
                 if let isbn = book.isbn {

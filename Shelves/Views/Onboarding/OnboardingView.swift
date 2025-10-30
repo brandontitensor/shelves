@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @EnvironmentObject var userManager: UserManager
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var currentPage = 0
     @State private var userName = ""
     @State private var showingNameInput = false
